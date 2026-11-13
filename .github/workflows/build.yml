@@ -1,0 +1,52 @@
+name: Derle (Windows + Linux)
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04      # eski glibc: Linux Mint 21+ üzerinde çalışır
+            artifact: EmlakOfis-Linux
+            bin: emlak-ofis
+          - os: windows-latest
+            artifact: EmlakOfis-Windows
+            bin: emlak-ofis.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux bağımlılıkları
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --release
+      - run: cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/release/${{ matrix.bin }}
+  paket:
+    # Linux + Windows dosyalarından tek güncelleme paketi (.zip) üretir
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: EmlakOfis-Linux
+          path: indir/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: EmlakOfis-Windows
+          path: indir/windows
+      - name: Paketle
+        run: |
+          SURUM=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          python3 arac/paketle_guncelleme.py --surum "$SURUM" --linux indir/linux/emlak-ofis --windows indir/windows/emlak-ofis.exe --cikti "EmlakOfis-Guncelleme-$SURUM.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EmlakOfis-Guncelleme
+          path: EmlakOfis-Guncelleme-*.zip

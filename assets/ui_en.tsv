@@ -1,0 +1,491 @@
+   ☀  Açık tema   	   ☀  Light theme   
+   🌙  Koyu tema   	   🌙  Dark theme   
+(Ağ adresi bulunamadı — ağa bağlı olduğunuzdan emin olun.)	(Network address not found — make sure you are connected to the network.)
+(SS:DD — geç kalma hesabı)	(HH:MM — used for lateness)
+(kapak fotoğrafı)	(cover photo)
++ Komisyon kaydı	+ Commission entry
++ Randevu	+ Appointment
++ Yeni Portföy	+ New listing
++ Yeni alıcı	+ New buyer
++ Yeni duyuru	+ New announcement
++ Yeni hedef belirle	+ Set new goal
++ Çalışana görev / toplantı / not ata	+ Assign task / meeting / note
++ İzin talebi	+ Leave request
+0 bıraktığınız kalem hedefe dahil edilmez. İlerleme sistemdeki kayıtlardan otomatik hesaplanır.	Items left at 0 are not part of the goal. Progress is calculated automatically from the records.
+1 fotoğraf	1 photo
+1. Temel bilgiler	1. Basic information
+2. Konum (Muğla)	2. Location (Muğla)
+3. Özellikler	3. Features
+4. Fotoğraflar	4. Photos
+5. Mülk sahibi bilgileri (CRM)	5. Property owner details (CRM)
+60 günden uzun süredir yayında olan portföyler	Listings published for more than 60 days
+60+ gündür yayında	Published 60+ days
+ANA BİLGİSAYAR (sunucu)	HOST COMPUTER (server)
+Ad	First name
+Ad Soyad	Full name
+Ad soyad *	Full name *
+Adres	Address
+Adres değiştirirseniz yeniden giriş yapmanız gerekir.	If you change the address you must sign in again.
+Adres kopyalandı.	Address copied.
+Adres:	Address:
+Aktif (programa girebilir)	Active (can sign in)
+Alt bilgi notu	Footer note
+Altlık:	Base map:
+Alıcı adı boş olamaz.	Buyer name cannot be empty.
+Alıcı anonimleştirildi.	Buyer anonymized.
+Alıcı kaydedildi.	Buyer saved.
+Alıcı silindi.	Buyer deleted.
+Alıcılar	Buyers
+Alıcının kriterlerine uyan yayındaki portföyler otomatik eşleşir; yeni portföy eklenince size bildirim gelir.	Published listings that fit the buyer's criteria are matched automatically; you are notified when a new matching listing is added.
+Alıcının telefon numarası yok.	The buyer has no phone number.
+Ana bilgisayar adresi:	Host computer address:
+Ana bilgisayar ve yedekleme	Host computer and backup
+Ana bilgisayar yeniden kurulduysa veya sertifikası yenilendiyse kullanın.	Use if the host computer was reinstalled or its certificate was renewed.
+Ana bilgisayara bağlantı	Connection to host computer
+Ana bilgisayara henüz paket yüklenmemiş. Yönetici paketi bu ekrandan kurunca otomatik yüklenir.	No package has been uploaded to the host yet. It is uploaded automatically when an admin installs a package from this screen.
+Ana bilgisayara ulaşılamıyor — Wi-Fi/ağ bağlantısını ve ana bilgisayarın açık olduğunu kontrol edin. Otomatik olarak yeniden deneniyor…	Cannot reach the host computer — check the Wi-Fi/network and that the host is on. Retrying automatically…
+Ana bilgisayara ulaşılamıyor.	Cannot reach the host computer.
+Ana bilgisayardaki paket	Package on the host computer
+Ana bilgisayardaki program	Program on the host computer
+Ana bilgisayardan indir ve kur	Download from host and install
+Ana bilgisayarın açık ve programın çalışıyor olduğundan, aynı ağda olduğunuzdan emin olun.	Make sure the host is on, the program is running and you are on the same network.
+Ana renk	Main color
+Ana renk başlıkları, seçili menüyü ve bağlantıları; buton rengi ana düğmeleri (Kaydet, Ekle…) boyar.	The main color paints headings, the selected menu and links; the button color paints primary buttons (Save, Add…).
+Ana renkle aynı	Same as main color
+Ana renkli başlık	Main-color heading
+Anahtar üretme (bir kez): emlak-ofis --anahtar-uret anahtarim  → anahtarim.gizli (saklayın, paylaşmayın) + açık anahtar ekrana basılır.\nPaket imzalama: emlak-ofis --paket-imzala EmlakOfis-Guncelleme-X.zip anahtarim.gizli	Key generation (once): emlak-ofis --anahtar-uret mykey  → mykey.gizli (keep it safe, never share) + the public key is printed.\nPackage signing: emlak-ofis --paket-imzala EmlakOfis-Guncelleme-X.zip mykey.gizli
+Anonimleştirildi	Anonymized
+Ara	Search
+Ara: ad, telefon, bölge…	Search: name, phone, area…
+Ara: ad, telefon, e-posta, not, portföy…	Search: name, phone, e-mail, note, listing…
+Ara: başlık, adres, mahalle, P-00012…	Search: title, address, neighborhood, P-00012…
+Aradığı	Looking for
+Ara…	Search…
+Ata ve bildirim gönder	Assign and notify
+Atama yapıldı; çalışanlara bildirim gitti.	Assigned; employees were notified.
+Ayar dosyası	Settings file
+Ayarlar	Settings
+Ayarlar kaydedildi.	Settings saved.
+Ayarlar › Güncelleme	Settings › Update
+Ayarları kaydet	Save settings
+Aylık puantaj	Monthly timesheet
+Aylık toplam:	Monthly total:
+Ayrıntı	Details
+Ayrıntılı anlatım KURULUM.docx dosyasındaki "Güncelleme" bölümündedir. Güncelleme kutusu bu sayfanın altındadır.	Details are in the "Update" section of KURULUM.docx. The update box is at the bottom of this page.
+Aç	Open
+Açık	Open
+Açık adres	Full address
+Açık rıza alındı	Consent obtained
+Açık tema gündüz, koyu tema loş ortamlar ve göz yorgunluğu için uygundur.	Light theme suits daytime; dark theme suits dim rooms and eye strain.
+Açıklama	Description
+Açıklama / sorumluluk / not	Description / responsibility / note
+Ağ adresi bulunamadı — bu bilgisayarın ağa bağlı olduğundan emin olun.	Network address not found — make sure this computer is connected to the network.
+Aşağıdaki metin WhatsApp'a aktarılır; göndermeden önce düzenleyebilirsiniz. Fotoğraflı PDF/DOCX göndermek için önce dosyayı kaydedin, sonra WhatsApp'ta ataç (📎) ile ekleyin.	The text below is passed to WhatsApp; you can edit it before sending. To send a PDF/DOCX with photos, save the file first, then attach it in WhatsApp with the paperclip (📎).
+Bağlantı	Connection
+Bağlantı ayarları	Connection settings
+Bağlantı noktası (port):	Port:
+Bağlantı örneği	Link example
+Bağlantıyı şifrele (HTTPS) — programı yeniden başlatınca etkinleşir	Encrypt the connection (HTTPS) — takes effect after restarting the program
+Başa sabitle	Pin to top
+Başlamadı	Not started
+Başlık	Title
+Başlık (örn: Cumartesi toplantısı)	Title (e.g. Saturday meeting)
+Başlık *	Title *
+Belge altındaki iletişim bilgisi:	Contact info at the bottom of documents:
+Belge altındaki çalışan (danışman) bilgileri	Employee (consultant) details at the bottom of documents
+Belge dili:	Document language:
+Belge hazırlanıyor…	Preparing document…
+Belge kaydedildi.	Document saved.
+Belgede gösterilecekler	Shown in the document
+Bildirim yok.	No notifications.
+Bildirimler	Notifications
+Bilgilerim	My details
+Bilgilerimi kaydet	Save my details
+Bilgileriniz kaydedildi.	Your details were saved.
+Bina yaşı	Building age
+Birden fazla seçebilir veya dosyaları pencereye sürükleyip bırakabilirsiniz. Kapak fotoğrafı ana ekranda ve çıktıda ilk görünen resimdir.	You can select several files or drag and drop them into the window. The cover photo is the first picture shown on the home screen and in documents.
+Biçim: YYYY-AA-GG SS:DD:ss  (örn: 2026-11-09 09:00:00). Çıkışı boş bırakırsanız mesai açık kalır.	Format: YYYY-MM-DD HH:MM:ss  (e.g. 2026-11-09 09:00:00). If you leave check-out empty the shift stays open.
+Boyut:	Size:
+Brüt alan (m²)	Gross area (m²)
+Bu ana bilgisayarla bağlantı ŞİFRELİ; sertifika kayıtlı.	The connection to this host is ENCRYPTED; the certificate is saved.
+Bu ana bilgisayarla bağlantı şifresiz (HTTP) veya henüz kurulmadı. Ana bilgisayarda HTTPS açılırsa otomatik şifreli bağlanılır.	The connection to this host is unencrypted (HTTP) or not yet established. If HTTPS is enabled on the host, the connection becomes encrypted automatically.
+Bu ay	This month
+Bu ay için mesai kaydı yok.	No attendance records for this month.
+Bu bağlantıdan koordinat çıkarılamadı. Haritada yere sağ tıklayıp koordinatı kopyalayın.	Could not extract coordinates from this link. Right-click a place on the map and copy the coordinates.
+Bu bilgiler yalnızca yöneticinin göreceği CRM kaydı olarak saklanır; diğer çalışanlar göremez.	This information is stored as a CRM record visible only to the admin; other employees cannot see it.
+Bu bilgiler, aldığınız PDF/DOCX tanıtım belgelerinin altında iletişim bilgisi olarak yer alır (yönetici hangi alanların görüneceğini Ayarlar'dan belirler).	This information appears as contact details at the bottom of the PDF/DOCX brochures you generate (the admin decides which fields are shown in Settings).
+Bu bilgisayar ANA BİLGİSAYAR olsun (veriler burada tutulur)	Make this computer the HOST (data is stored here)
+Bu bilgisayar nasıl çalışsın?	How should this computer work?
+Bu bilgisayar ofis saatlerinde açık kalmalıdır.	This computer must stay on during office hours.
+Bu bilgisayar ofisteki ana bilgisayara BAĞLANSIN	Make this computer CONNECT to the office host
+Bu bilgisayardaki program	Program on this computer
+Bu bilgisayarın rolü	Role of this computer
+Bu filtrede görev yok.	No tasks in this filter.
+Bu gün için randevu yok.	No appointments for this day.
+Bu yıl için izin kaydı yok.	No leave records for this year.
+Bulunduğu kat	Floor
+Buton rengi	Button color
+Bölge	Area
+Bütçe	Budget
+CRM (Mülk Sahipleri)	CRM (Property Owners)
+CSV olarak kaydet	Save as CSV
+Cadde / sokak / site adı, kapı no…	Street / site name, door no…
+Daha sonra	Later
+Dahili notlar	Internal notes
+Denetim kaydı	Audit log
+Denetle	Check
+Devam	Continue
+Devam ediyor	In progress
+Dikkat: Bu bilgisayarla ana bilgisayarın program sürümleri farklı. Tüm bilgisayarları aynı sürüme güncelleyin.	Warning: this computer and the host run different program versions. Update all computers to the same version.
+Dil	Language
+Diğer bilgisayarlar ilk bağlanışta bu parmak izini kaydeder; sonradan değişirse bağlantı reddedilir.	Other computers save this fingerprint on first connection; if it later changes the connection is refused.
+Diğer bilgisayarlar şu adreslerden birine bağlanır:	Other computers connect to one of these addresses:
+Diğer bilgisayarların bağlanacağı adres	Address other computers connect to
+Dosya seç ve çöz…	Choose file and decrypt…
+Dosyayı aç	Open file
+Durum	Status
+Duyuru yayınlandı.	Announcement published.
+Duyuru yok.	No announcements.
+Duyurular	Announcements
+Dönem	Period
+Dönem bitti	Period ended
+Düzenle	Edit
+E-posta	E-mail
+Ekle	Add
+Emin misiniz? Sil	Are you sure? Delete
+Emlak Ofis — portföy, CRM, mesai, görev ve hedef yönetimi. Yalnızca ofis içi kullanım içindir.	Emlak Ofis — listings, CRM, attendance, tasks and goals. For in-office use only.
+En az bir hedef kalemi girin.	Enter at least one goal item.
+En fazla fotoğraf sayısı:	Maximum number of photos:
+Enlem / Boylam	Latitude / Longitude
+Enlem ve boylamın ikisini birden girin (ya da ikisini de boş bırakın).	Enter both latitude and longitude (or leave both empty).
+Etiketler	Labels
+Excel için CSV olarak kaydet	Save as CSV for Excel
+Eşyalı	Furnished
+Filtreleri temizleyin veya yeni bir portföy ekleyin.	Clear the filters or add a new listing.
+Fiyat	Price
+Fiyat geçmişi	Price history
+Fotoğraf döndürüldü.	Photo rotated.
+Fotoğraf ekle…	Add photos…
+Fotoğraf seç…	Choose photos…
+Fotoğraflar	Photos
+Fotoğrafı kaldır	Remove photo
+Geri aç	Reopen
+Giriş	Sign in
+Giriş yap	Sign in
+Gizle	Hide
+Google Haritalar bağlantısını veya "36.62, 29.11" yazın	Paste a Google Maps link or type "36.62, 29.11"
+Gönder	Send
+Görünüm	Appearance
+Görünüm:	View:
+Gösterilecek portföy yok.	No listings to show.
+Güncelleme	Update
+Güncelleme güvenliği (dijital imza)	Update security (digital signature)
+Güncelleme paketi seç (.zip)…	Choose update package (.zip)…
+Güncelleme paketini (EmlakOfis-Guncelleme-….zip) seçin; program kapanır, kurar ve kendiliğinden yeniden açılır. Yeni sürüm açılmazsa eski sürüme otomatik dönülür.	Choose the update package (EmlakOfis-Guncelleme-….zip); the program closes, installs and reopens by itself. If the new version fails to open, it rolls back to the old one automatically.
+Güvenilir yayıncı anahtarı (açık anahtar):	Trusted publisher key (public key):
+Güvenlik duvarı izni (bir kez yapılır)	Firewall permission (once)
+Hakkında	About
+Hakkında ve güncelleme	About and update
+Harici yedek (şifreli)	External backup (encrypted)
+Harita	Map
+Harita bağlantısı	Map link
+Haritada aç	Open on map
+Haritada yer ara	Search place on map
+Haritadan bir nokta seçin.	Select a point on the map.
+Hazır	Ready
+Hedef atandı.	Goal assigned.
+Hedefi ata	Assign goal
+Hedefler	Goals
+Henüz atanmış hedef yok.	No goals assigned yet.
+Henüz hiç kullanıcı yok. Yönetici (admin) hesabını oluşturun; diğer çalışanları sonra Çalışanlar ekranından eklersiniz.	There are no users yet. Create the admin account; you can add other employees later from the Employees screen.
+Her yedek ayrıca bu klasöre kopyalanır (USB bellek, NAS, bulut eşitleme klasörü vb.). Parola girilirse dosya şifrelenir (.db.enc).	Every backup is also copied to this folder (USB drive, NAS, cloud sync folder, etc.). If a password is set the file is encrypted (.db.enc).
+Hesabı oluştur ve giriş yap	Create account and sign in
+Isıtma	Heating
+Kablolu ve kablosuz (Wi-Fi) bilgisayarlar aynı ağdaysa aynı adresi kullanır.	Wired and wireless (Wi-Fi) computers on the same network use the same address.
+Kablosuz (Wi-Fi) ve karışık ağ kullanımı	Wireless (Wi-Fi) and mixed network use
+Kapak yap	Make cover
+Kapat	Close
+Kategori	Category
+Kaydedildi.	Saved.
+Kaydedilen dosyanın klasörünü aç	Open the folder of the saved file
+Kaydediliyor (fotoğraflar yükleniyor)…	Saving (uploading photos)…
+Kaydet	Save
+Kaydet ve yeniden bağlan	Save and reconnect
+Kayıt anonimleştirildi.	Record anonymized.
+Kayıt güncellendi.	Record updated.
+Kayıtlı alıcı yok.	No buyers on file.
+Kim, ne zaman, ne yaptı — son 400 kayıt.	Who did what and when — last 400 entries.
+Kime atanacak?	Assign to whom?
+Kimin için?	For whom?
+Kişisel verilerin işlenmesine açık rıza alındı	Explicit consent for processing personal data obtained
+Klasör	Folder
+Klasörü aç	Open folder
+Komisyonlar	Commissions
+Komut kopyalandı.	Command copied.
+Koordinat değerleri geçersiz.	Invalid coordinate values.
+Koordinat kopyalandı.	Coordinates copied.
+Koordinatı kopyala	Copy coordinates
+Koordinatı çöz	Resolve coordinates
+Kopyala	Copy
+Krediye uygun	Mortgage eligible
+Kullanıcı adı	Username
+Kullanıcı açık oturumlardan çıkarılır; yeni şifreyle girer.	The user is signed out of open sessions and signs in with the new password.
+Kur ve yeniden başlat	Install and restart
+Kurulum sırasında eski program '.eski' adıyla program klasöründe saklanır. Güvenlik: aşağıya güvenilir yayıncı anahtarı girerseniz yalnızca imzalı paketler kurulur.	During installation the old program is kept in the program folder with the '.eski' extension. Security: if you enter a trusted publisher key below, only signed packages are installed.
+Küçük resim boyutu	Thumbnail size
+Küçük resimler	Thumbnails
+Liste	List
+Listede yok, elle yazacağım	Not in the list, I will type it
+Listeyi Excel için CSV olarak kaydet	Save the list as CSV for Excel
+Listeyi göster	Show list
+Logo	Logo
+Logo seç…	Choose logo…
+Logo yüklendi.	Logo uploaded.
+Logo:	Logo:
+Logoyu kaldır	Remove logo
+Mahalle	Neighborhood
+Mahalle / köy adı	Neighborhood / village name
+Mahalle ekle	Add neighborhood
+Mesai	Attendance
+Mesai başladı. Kolay gelsin!	Shift started. Have a good day!
+Mesai başlangıç saati	Shift start time
+Mesai bitirildi. İyi dinlenmeler!	Shift ended. Have a good rest!
+Mesai kaydı güncellendi.	Attendance record updated.
+Mesaiye başla	Start shift
+Mesaiyi bitir	End shift
+Metin panoya kopyalandı.	Text copied to clipboard.
+Metni kopyala	Copy text
+Mevcut şifre	Current password
+Muğla'nın ilçe ve mahalleleri hazır gelir. Eksik veya yeni bir mahalle varsa buradan ekleyebilirsiniz. Silme işlemi mevcut portföyleri etkilemez.	Muğla's districts and neighborhoods come built in. Add any missing or new neighborhood here. Deleting does not affect existing listings.
+Mülk sahibi (CRM) bilgileri hiçbir çıktıda yer almaz.	Property owner (CRM) details never appear in any output.
+Mülk sahibi (yalnızca yönetici görür)	Property owner (visible to admin only)
+Mülk sahibi bilgileri yalnızca yönetici tarafından görülür ve düzenlenir.	Property owner details are seen and edited by the admin only.
+Müşteriye verilen çıktılarda görünmez; tüm çalışanlar görür.	Not shown in customer documents; all employees can see it.
+Net alan (m²)	Net area (m²)
+Not	Note
+Not ekle…	Add note…
+Oda	Room
+Oda sayısı	Rooms
+Ofis adresi	Office address
+Ofis adı	Office name
+Ofis ağındaki trafiği (şifreler, müşteri bilgileri) dinlemeye karşı şifreler.	Encrypts office network traffic (passwords, customer data) against eavesdropping.
+Ofis iletişim bilgileri	Office contact details
+Ofis telefonu	Office phone
+Ofisteki bilgisayarların verileri ortak kullanabilmesi için bilgisayarlardan BİRİ ana bilgisayar (sunucu) olur, diğerleri ona bağlanır.	So that office computers can share data, ONE of them acts as the host (server) and the others connect to it.
+Onayla	Approve
+Oran %	Rate %
+PDF olarak kaydet	Save as PDF
+Paketi siz imzalarsınız; bilgisayarlar yalnızca sizin imzanızı taşıyan paketi kurar. Anahtar yoksa imza denetlenmez.	You sign the package; computers install only packages carrying your signature. Without a key the signature is not checked.
+Panel	Dashboard
+Parola	Password
+Parolayla şifrelenmiş .db.enc dosyasını normal .db dosyasına çevirir. Doğrudan geri yüklemek için yukarıdaki bölümü kullanın (şifreli dosyayı çözmeden seçebilirsiniz).	Converts a password-encrypted .db.enc file into a normal .db file. To restore directly, use the section above (you can select the encrypted file without decrypting it).
+Parolayı kaldır	Remove password
+Portföy başlığı boş olamaz.	Listing title cannot be empty.
+Portföy kaydedildi.	Listing saved.
+Portföy no	Listing no
+Portföy silindi.	Listing deleted.
+Portföy • CRM • Mesai • Görev yönetimi	Listings • CRM • Attendance • Task management
+Portföyler	Listings
+Portföyleri:	Listings:
+Portföyü aç	Open listing
+Portföyün tanıtım metni…	Listing description…
+Profil fotoğrafı	Profile photo
+Profil fotoğrafı güncellendi.	Profile photo updated.
+Profilim	My profile
+Program açılırken ve her 6 saatte bir otomatik yedek alınır (son 30 yedek saklanır).	A backup is made automatically at startup and every 6 hours (the last 30 are kept).
+Program dili:	Program language:
+Program dili seçilir. Tarih, para ve belge çıktısı dili ayrıca belirlenir.	Choose the program language. Dates, currency and the document output language are set separately.
+Programı güncelleme (özet)	Updating the program (summary)
+Randevu başlığı gerekli.	Appointment title is required.
+Randevu ekle	Add appointment
+Randevu kaydedildi.	Appointment saved.
+Rapor (CSV)	Report (CSV)
+Rapor (PDF)	Report (PDF)
+Reddet	Reject
+Renkler	Colors
+Rust • egui • SQLite. İlçe/mahalle verisi: turkey-neighbourhoods (MIT lisansı).	Rust • egui • SQLite. District/neighborhood data: turkey-neighbourhoods (MIT license).
+Sadece benimkiler	Mine only
+Sahibinden / Hepsiemlak / sosyal medya için hazır metin.	Ready-made text for listing sites / social media.
+Satılık	For sale
+Sağa al	Move right
+Sağa döndür	Rotate right
+Sertifika güveni sıfırlandı; bir sonraki bağlantıda yeniden kaydedilir.	Certificate trust reset; it will be saved again on the next connection.
+Sertifika güvenini sıfırla	Reset certificate trust
+Seçilen yedek doğrulanır; mevcut veri 'yedekler' klasörüne ayrıca saklanır. Program kapanır, geri yükler ve yeniden açılır. Şifreli (.db.enc) yedek için aşağıdaki parola kutusunu doldurun. DİKKAT: geri yüklenen yedekten sonra eklenen kayıtlar yeni veride olmaz; diğer bilgisayarlar bağlantıyı yeniden kurar.	The selected backup is verified; the current data is also kept in the 'yedekler' folder. The program closes, restores and reopens. For an encrypted (.db.enc) backup fill in the password box below. WARNING: records added after the restored backup will not be in the new data; other computers reconnect.
+Seçili portföy	Selected listing
+Slogan	Slogan
+Sola al	Move left
+Sola döndür	Rotate left
+Soldan bir alıcı seçin ya da yeni alıcı ekleyin.	Select a buyer on the left or add a new one.
+Son yedekler:	Latest backups:
+Sonraki ay ›	Next month ›
+Sonraki ›	Next ›
+Soyad	Last name
+Sürükleyerek kaydırın, fare tekerleğiyle yakınlaştırın. Noktaya tıklayın. Harita karoları internetten indirilir ve bilgisayarda saklanır (çevrimdışıyken daha önce görülen alanlar açılır).	Drag to pan, use the mouse wheel to zoom. Click a point. Map tiles are downloaded from the internet and stored on this computer (areas seen before open offline).
+Sürüm	Version
+Sıfırla	Reset
+Takasa uygun	Open to swap
+Takvim	Calendar
+Tamamlanan	Completed
+Tapu durumu	Title deed status
+Tarih	Date
+Tarih / saat belirle	Set date / time
+Taslak: hazırlanıyor • Yayında: aktif ilan	Draft: being prepared • Published: active listing
+Telefon	Phone
+Telefon (isteğe bağlı):	Phone (optional):
+Tema	Theme
+Temizle	Clear
+Testler	Tests
+Toplam kat	Total floors
+Tüm zamanlar	All time
+Tümü	All
+Tümünü seç	Select all
+Türkçe	Turkish
+Varsayılan görünüme dön	Back to default appearance
+Vazgeç	Cancel
+Veri klasörü	Data folder
+Veri yok.	No data.
+Veriler bu bilgisayarda tutulur; diğer bilgisayarlar buraya bağlanır. Ofis saatlerinde açık kalmalıdır.	Data is stored on this computer; other computers connect here. It must stay on during office hours.
+Verileri dışa aktar	Export data
+Verilerini dışa aktar (KVKK)	Export their data (KVKK)
+Vurgu rengi	Accent color
+WhatsApp'ta aç	Open in WhatsApp
+WhatsApp'ta paylaş	Share on WhatsApp
+WhatsApp ile paylaş	Share via WhatsApp
+Word (DOCX) olarak kaydet	Save as Word (DOCX)
+YENİ	NEW
+Yayında	Published
+Yayınla	Publish
+Yayınlanınca tüm çalışanlara bildirim gider.	All employees are notified when it is published.
+Yazı boyutu:	Font size:
+Yazı tipi ve boyutu	Font and size
+Yazı tipi:	Font:
+Yazılar okunaksızsa boyutu büyütün. Yazı tipi yalnızca bu bilgisayarı etkiler.	If text is hard to read, increase the size. The font affects this computer only.
+Yedek dosyası seç…	Choose backup file…
+Yedek parolası	Backup password
+Yedek parolası (yalnızca şifreli yedek için)	Backup password (encrypted backups only)
+Yedekleme ve sunucu	Backup and server
+Yedekten geri yükle (yalnızca ana bilgisayar)	Restore from backup (host computer only)
+Yeni atama	New assignment
+Yeni duyuru	New announcement
+Yeni görevler, toplantılar, hedefler ve ekip arkadaşlarınızın eklediği portföyler burada görünür.	New tasks, meetings, goals and listings added by your teammates appear here.
+Yeni hedef	New goal
+Yeni çalışan ekle	Add new employee
+Yeni şifre	New password
+Yeni şifre (en az 6 karakter):	New password (at least 6 characters):
+Yeni şifre (tekrar)	New password (again)
+Yeni şifreler aynı değil.	The new passwords do not match.
+Yeni/uygun portföy olunca alıcı sahibine eşleşme bildirimi gönder	Notify the buyer's owner when a new/matching listing appears
+Yeniden dene	Retry
+Yenile	Refresh
+Yetki	Role
+Yönetici	Admin
+Yönetici kullanıcı adı (en az 3 harf)	Admin username (at least 3 letters)
+Yönetici olarak kurarsanız paket ayrıca ana bilgisayara yüklenir; diğer bilgisayarlar açılışta 'yeni sürüm hazır' bildirimi görür.	If you install as admin, the package is also uploaded to the host; other computers see a 'new version ready' notice at startup.
+Yükleniyor…	Loading…
+ad	first name
+boylam	longitude
+boş = imza denetimi kapalı	empty = signature check off
+devam ediyor	in progress
+değiştir	change
+en az	at least
+en çok	at most
+enlem	latitude
+işlem tutarı	deal amount
+kullanıcı adı	username
+soyad	last name
+veya komisyon	or commission
+yeni ilçe adı	new district name
+yeni mahalle / köy adı	new neighborhood / village name
+yok	none
+Çalışan bazında özet	Summary by employee
+Çalışan eklendi. Kullanıcı adı ve şifresini kendisine iletin.	Employee added. Give them their username and password.
+Çalışan güncellendi.	Employee updated.
+Çalışan payı %	Employee share %
+Çalışanlar	Employees
+Çalışanlar silinmez, "pasif" yapılır; böylece geçmiş portföy ve mesai kayıtları korunur. Pasif kullanıcı programa giremez.	Employees are not deleted, they are made "inactive" so past listings and attendance stay intact. An inactive user cannot sign in.
+Çalışanların aldığı tanıtım belgelerinde nelerin görüneceğini buradan belirlersiniz.	Here you decide what appears in the brochures employees generate.
+Çalışanların portföy kaydederken girdiği mülk sahibi bilgileri burada otomatik listelenir. Bu ekranı yalnızca yönetici görür.	Property owner details entered by employees when saving a listing are listed here automatically. Only the admin sees this screen.
+Çıkar	Remove
+Çıktı (PDF / DOCX / WhatsApp) ayarları	Output (PDF / DOCX / WhatsApp) settings
+Çıktı ayarları	Output settings
+Çıkış	Sign out
+Önizleme	Preview
+Örn: Kasım ayı hedefi	E.g. November goal
+Örn: Çalış'ta deniz manzaralı 3+1 daire	E.g. 3+1 flat with sea view in Çalış
+Örnek: Çalışkan öğrenci şimdi yağmurda üşüdü — ĞÜŞİÖÇ ığüşöç 0123456789	Sample: The quick brown fox jumps over the lazy dog — ĞÜŞİÖÇ ığüşöç 0123456789
+Özel renk seç	Pick custom color
+Özellik tablosu	Features table
+örn: 3	e.g. 3
+örn: 5	e.g. 5
+İSTEMCİ	CLIENT
+İlan metni	Listing text
+İlan metni panoya kopyalandı.	Listing text copied to clipboard.
+İlan türü	Listing type
+İlk kurulum	First setup
+İlçe *	District *
+İlçe / Mahalleler	Districts / Neighborhoods
+İlçe / mahalleye göre grupla	Group by district / neighborhood
+İlçe seçin.	Select a district.
+İlçeler	Districts
+İmza denetimi AÇIK: imzasız veya başka anahtarla imzalı paket reddedilir.	Signature check ON: unsigned packages or packages signed with another key are rejected.
+İmza denetimi KAPALI.	Signature check OFF.
+İmza denetlenmedi (güvenilir yayıncı anahtarı tanımlı değil).	Signature not checked (no trusted publisher key set).
+İptal et	Cancel
+İpucu: "Haritada yer ara" ile yeri bulun, işaretçiye sağ tıklayıp koordinatı kopyalayın ve yukarıdaki kutuya yapıştırın.	Tip: find the place with "Search place on map", right-click the marker, copy the coordinates and paste them into the box above.
+İzin / Puantaj	Leave / Timesheet
+İzin kaydedildi.	Leave saved.
+İzinler	Leaves
+Şifre	Password
+Şifre (en az 6 karakter)	Password (at least 6 characters)
+Şifre (tekrar)	Password (again)
+Şifre değiştir	Change password
+Şifre sıfırla	Reset password
+Şifre sıfırlandı.	Password reset.
+Şifreli bağlantı (HTTPS)	Encrypted connection (HTTPS)
+Şifreli yedeği çöz	Decrypt encrypted backup
+Şifreniz değiştirildi.	Your password was changed.
+Şifreyi değiştir	Change the password
+Şimdi yedek al	Back up now
+Şimdi yedekle	Back up now
+Şu an eşleşen portföy yok. Yeni uygun portföy eklenince bildirim gelir.	No matching listings right now. You will be notified when a suitable one is added.
+Şu an mesaide değilsiniz.	You are not on shift right now.
+Şu an: ŞİFRELİ	Currently: ENCRYPTED
+Şu an: şifresiz (HTTP). Yalnızca güvendiğiniz ofis ağında kullanın.	Currently: unencrypted (HTTP). Use only on an office network you trust.
+şifre (min. 6)	password (min. 6)
+‹ Önceki	‹ Previous
+‹ Önceki ay	‹ Previous month
+← Portföylere dön	← Back to listings
+■ Eklenen	■ Added
+✓ Tamamla	✓ Complete
+📢 Duyuru	📢 Announcement
+Benim portföylerim	My listings
+Hepsi	All
+Sokak	Street
+Uydu	Satellite
+Çevrimdışı	Offline
+Kiralık	For rent
+Arazi	Land
+Tüm testleri çalıştır	Run all tests
+Programın kendi kendine testleri: geçici bir sunucu başlatır, yetkileri, akışları, HTTPS'i, imzayı, yedeği, belge çıktısını ve haritayı dener. Gerçek verilerinize dokunmaz.	The program's built-in self-tests: starts a temporary server and checks permissions, workflows, HTTPS, signing, backup, document output and the map. Your real data is not touched.
+Ana bilgisayar:	Host computer:
+Görünüm paketi	Appearance pack
+Klasik	Classic
+Altın & Lacivert	Gold & Navy
+Gece (derin koyu)	Night (deep dark)
+Altın & Lacivert ve Gece paketleri koyu çalışır; menü ve ortadaki alanlar daha karanlık, grafikler daha okunaklıdır.	Gold & Navy and Night packs run dark; the menu and centre areas are darker and charts are easier to read.
+Giriş ekranı arka planı	Login screen background
+Açılış ekranında tam ekran görünür. Kendi resminizi seçebilirsiniz.	Shown full-screen on the opening screen. You can choose your own picture.
+Gün batımı (varsayılan)	Sunset (default)
+Göl evi	Lake house
+Kendi resmim	My own picture
+Düz zemin	Plain background
+Resim seç…	Choose picture…
+En az	At least
+Büyük resimler otomatik küçültülür (en uzun kenar 2560 px); çok küçük resimler kabul edilmez.	Large pictures are shrunk automatically (longest side 2560 px); pictures that are too small are rejected.
+Portföy, müşteri ilişkileri, mesai ve görev yönetimi — ofisinizin tüm işleri tek, güvenli ve hızlı bir çatı altında.	Portfolio, customer relations, attendance and task management — all your office work under one secure, fast roof.
+Mobil uygulamamız	Our mobile app
+Portföylerinize cebinizden de ulaşın. Android için Google Play'de.	Reach your portfolios from your pocket too. On Google Play for Android.
+Google Play'de görüntüle	View on Google Play
+Hoş geldiniz	Welcome
+Devam etmek için giriş yapın	Sign in to continue

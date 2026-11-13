@@ -1,0 +1,39 @@
+# Derleme çıktıları
+/target/
+**/*.rs.bk
+
+# Veri ve yedekler (müşteri/CRM bilgisi İÇERİR — asla yüklenmez)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.enc
+/yedekler/
+/emlak_veri/
+/veri/
+ayarlar.json
+
+# Gizli bilgiler
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets*
+*.token
+
+# Üretilmiş paketler / ikili dosyalar (GitHub Releases kullanın)
+*.zip
+*.exe
+emlak-ofis-*-linux-*
+/EmlakOfis*/
+
+# Editör / sistem
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
