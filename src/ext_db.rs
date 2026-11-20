@@ -72,6 +72,15 @@ impl Db {
                 format!("Bu veritabanı daha yeni bir program sürümüyle oluşturulmuş (şema {ver}). Önce programı güncelleyin."),
             ));
         }
+        for col in ["description_en", "description_ru"] {
+            if !has_column(&self.conn, "portfolios", col) {
+                self.conn.execute_batch(&format!("ALTER TABLE portfolios ADD COLUMN {col} TEXT NOT NULL DEFAULT '';"))?;
+            }
+        }
+        if !has_column(&self.conn, "crm_contacts", "photo") {
+            self.conn.execute_batch("ALTER TABLE crm_contacts ADD COLUMN photo BLOB;")?;
+        }
+        crate::web::ensure_columns(self)?;
         if ver == DB_VERSION {
             return Ok(());
         }
@@ -132,6 +141,61 @@ impl Db {
         Ok(out)
     }
 
+    /// Aylık ofis raporu için veriler (ym = "YYYY-MM").
+    pub fn monthly_report(&self, ym: &str) -> R<serde_json::Value> {
+        use serde_json::json;
+        if ym.len() != 7 || !ym.chars().enumerate().all(|(i, c)| if i == 4 { c == '-' } else { c.is_ascii_digit() }) {
+            return Err(ApiErr::bad("Ay biçimi YYYY-AA olmalı (ör. 2026-11)."));
+        }
+        let like = format!("{ym}%");
+        let c = &self.conn;
+        let one = |sql: &str| -> i64 { c.query_row(sql, params![like], |r| r.get(0)).unwrap_or(0) };
+        let new_total = one("SELECT COUNT(*) FROM portfolios WHERE created_at LIKE ?1");
+        let published = one("SELECT COUNT(*) FROM portfolios WHERE published_at LIKE ?1");
+        let sold = one("SELECT COUNT(*) FROM portfolios WHERE closed_at LIKE ?1 AND status='Satıldı'");
+        let rented = one("SELECT COUNT(*) FROM portfolios WHERE closed_at LIKE ?1 AND status='Kiralandı'");
+        let rows = |sql: &str| -> R<Vec<(String, i64, f64, f64)>> {
+            let mut st = c.prepare(sql)?;
+            let it = st.query_map(params![like], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, f64>(2)?, r.get::<_, f64>(3)?)))?;
+            Ok(it.filter_map(|x| x.ok()).collect())
+        };
+        let by_type: Vec<_> = rows("SELECT listing_type, COUNT(*), 0.0, 0.0 FROM portfolios WHERE created_at LIKE ?1 GROUP BY listing_type ORDER BY 2 DESC")?.into_iter().map(|r| json!({"name": r.0, "n": r.1})).collect();
+        let by_district: Vec<_> = rows("SELECT CASE WHEN district='' THEN '(belirtilmemiş)' ELSE district END, COUNT(*), 0.0, 0.0 FROM portfolios WHERE created_at LIKE ?1 GROUP BY 1 ORDER BY 2 DESC LIMIT 8")?.into_iter().map(|r| json!({"name": r.0, "n": r.1})).collect();
+        let comm: Vec<_> = rows("SELECT currency, COUNT(*), COALESCE(SUM(deal_amount),0), COALESCE(SUM(commission),0) FROM commissions WHERE date LIKE ?1 GROUP BY currency")?.into_iter().map(|r| json!({"currency": r.0, "n": r.1, "deal": r.2, "commission": r.3})).collect();
+        let comm_status: Vec<_> = rows("SELECT status, COUNT(*), COALESCE(SUM(commission),0), 0.0 FROM commissions WHERE date LIKE ?1 GROUP BY status")?.into_iter().map(|r| json!({"status": r.0, "n": r.1, "commission": r.2})).collect();
+        let appt: Vec<_> = rows("SELECT status, COUNT(*), 0.0, 0.0 FROM appointments WHERE start_at LIKE ?1 GROUP BY status")?.into_iter().map(|r| json!({"status": r.0, "n": r.1})).collect();
+        // çalışan bazlı
+        let mut users = Vec::new();
+        {
+            let mut st = c.prepare("SELECT id, CASE WHEN trim(first_name||last_name)='' THEN username ELSE trim(first_name||' '||last_name) END FROM users WHERE active=1 ORDER BY 2")?;
+            let it = st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+            for u in it.filter_map(|x| x.ok()) {
+                let q = |sql: &str| -> i64 { c.query_row(sql, params![u.0, like], |r| r.get(0)).unwrap_or(0) };
+                let newp = q("SELECT COUNT(*) FROM portfolios WHERE creator_id=?1 AND created_at LIKE ?2");
+                let closed = q("SELECT COUNT(*) FROM portfolios WHERE creator_id=?1 AND closed_at LIKE ?2");
+                let appts = q("SELECT COUNT(*) FROM appointments WHERE user_id=?1 AND start_at LIKE ?2");
+                let cm: f64 = c.query_row("SELECT COALESCE(SUM(emp_amount),0) FROM commissions WHERE user_id=?1 AND date LIKE ?2", params![u.0, like], |r| r.get(0)).unwrap_or(0.0);
+                // mesai
+                let mut days = std::collections::HashSet::new();
+                let mut secs = 0i64;
+                let mut st2 = c.prepare("SELECT check_in, check_out FROM attendance WHERE user_id=?1 AND check_in LIKE ?2")?;
+                for (a, b) in st2.query_map(params![u.0, like], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.filter_map(|x| x.ok()) {
+                    days.insert(a.chars().take(10).collect::<String>());
+                    let f = "%Y-%m-%d %H:%M:%S";
+                    if let (Ok(x), Ok(y)) = (chrono::NaiveDateTime::parse_from_str(&a, f), chrono::NaiveDateTime::parse_from_str(&b, f)) {
+                        secs += (y - x).num_seconds().max(0);
+                    }
+                }
+                if newp + closed + appts + days.len() as i64 > 0 || cm > 0.0 {
+                    users.push(json!({"name": u.1, "new": newp, "closed": closed, "appointments": appts, "days": days.len(), "hours": (secs as f64 / 360.0).round() / 10.0, "commission": cm}));
+                }
+            }
+        }
+        Ok(json!({"ym": ym, "new_total": new_total, "published": published, "sold": sold, "rented": rented,
+            "by_type": by_type, "by_district": by_district, "commissions": comm, "commission_status": comm_status,
+            "appointments": appt, "users": users}))
+    }
+
     pub fn kv_get(&self, key: &str) -> Option<String> {
         self.conn.query_row("SELECT value FROM settings WHERE key=?1", params![key], |r| r.get(0)).optional().ok().flatten()
     }
@@ -154,30 +218,93 @@ impl Db {
         self.kv_get("ext_backup_dir").unwrap_or_default()
     }
 
-    /// Yeni alınan yedeği ayarlı harici klasöre kopyalar; şifre ayarlıysa şifreleyerek (.db.enc).
+    /// Güvenli yerel yedek klasörü: varsayılan Belgeler/Emlak Ofis Yedek (program kaldırılsa bile silinmez).
+    pub fn safe_backup_dir(&self) -> PathBuf {
+        let v = self.kv_get("safe_backup_dir").unwrap_or_default();
+        if !v.trim().is_empty() {
+            return PathBuf::from(v.trim());
+        }
+        if self.path.starts_with(std::env::temp_dir()) {
+            return self.backup_dir().join("guvenli"); // testler gerçek Belgeler klasörünü kirletmesin
+        }
+        directories::UserDirs::new()
+            .and_then(|u| u.document_dir().map(|d| d.to_path_buf()))
+            .or_else(|| directories::UserDirs::new().map(|u| u.home_dir().join("Documents")))
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("Emlak Ofis Yedek")
+    }
+
+    /// Tutulacak yedek sayısı (varsayılan 14)
+    pub fn backup_keep(&self) -> usize {
+        self.kv_get("backup_keep").and_then(|v| v.trim().parse::<usize>().ok()).unwrap_or(14).clamp(2, 365)
+    }
+
+    /// rclone ile buluta (ör. Google Drive) yükler: şifreli tek dosya, arka planda. Durum dosyaya yazılır.
+    pub fn rclone_sync(&self, backup: &Path) -> Result<(), String> {
+        let remote = self.kv_get("rclone_remote").unwrap_or_default();
+        let remote = remote.trim();
+        if remote.is_empty() {
+            return Ok(());
+        }
+        if self.kv_get("ext_backup_pw").unwrap_or_default().is_empty() {
+            return Err("Buluta yedek için yedek parolası gerekli (veriler şifrelenmeden buluta gönderilmez).".into());
+        }
+        let local = self.copy_into(&self.backup_dir().join("bulut"), backup, true)?;
+        let status = self.backup_dir().join("rclone_son_durum.txt");
+        let dest = format!("{}/{}", remote.trim_end_matches('/'), local.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
+        std::thread::spawn(move || {
+            let r = std::process::Command::new("rclone").arg("copyto").arg(&local).arg(&dest).output();
+            let msg = match r {
+                Ok(o) if o.status.success() => format!("{} OK -> {}", crate::common::now_str(), dest),
+                Ok(o) => format!("{} HATA: {}", crate::common::now_str(), String::from_utf8_lossy(&o.stderr).trim()),
+                Err(e) => format!("{} HATA: rclone çalıştırılamadı ({e}). rclone kurulu mu?", crate::common::now_str()),
+            };
+            let _ = std::fs::write(status, msg);
+        });
+        Ok(())
+    }
+
+    /// Ortak kopyalama: şifre ayarlıysa şifreler. overwrite=true ise tek dosyanın (emlak_son_yedek) üzerine yazar.
+    fn copy_into(&self, dir: &Path, backup: &Path, overwrite: bool) -> Result<PathBuf, String> {
+        std::fs::create_dir_all(dir).map_err(|e| format!("Yedek klasörü açılamadı: {e}"))?;
+        let name = if overwrite { "emlak_son_yedek.db".to_string() } else { backup.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "emlak.db".into()) };
+        let pw = self.kv_get("ext_backup_pw").unwrap_or_default();
+        let data = std::fs::read(backup).map_err(|e| e.to_string())?;
+        let (out_name, bytes) = if pw.is_empty() { (name, data) } else { (format!("{name}.enc"), encrypt_bytes(&data, &pw)?) };
+        let target = dir.join(&out_name);
+        let tmp = dir.join(format!("{out_name}.tmp"));
+        std::fs::write(&tmp, bytes).map_err(|e| format!("Yedek yazılamadı: {e}"))?;
+        std::fs::rename(&tmp, &target).map_err(|e| format!("Yedek yazılamadı: {e}"))?;
+        if overwrite {
+            // parola eklendi/kaldırıldıysa diğer biçimdeki eski tek dosyayı sil
+            let other = if out_name.ends_with(".enc") { "emlak_son_yedek.db" } else { "emlak_son_yedek.db.enc" };
+            let _ = std::fs::remove_file(dir.join(other));
+        } else {
+            let mut files: Vec<String> = std::fs::read_dir(dir)
+                .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.starts_with("emlak_") && n != "emlak_son_yedek.db" && (n.ends_with(".db") || n.ends_with(".db.enc"))).collect())
+                .unwrap_or_default();
+            files.sort();
+            while files.len() > self.backup_keep() {
+                let old = files.remove(0);
+                let _ = std::fs::remove_file(dir.join(old));
+            }
+        }
+        Ok(target)
+    }
+
+    /// Yeni alınan yedeği ayarlı harici/bulut klasörüne kopyalar (varsayılan: tek dosyanın üzerine yazar).
     pub fn copy_external(&self, backup: &Path) -> Result<Option<PathBuf>, String> {
         let dir = self.external_backup_dir();
         if dir.trim().is_empty() {
             return Ok(None);
         }
-        let dir = PathBuf::from(dir.trim());
-        std::fs::create_dir_all(&dir).map_err(|e| format!("Harici yedek klasörü açılamadı: {e}"))?;
-        let name = backup.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "emlak.db".into());
-        let pw = self.kv_get("ext_backup_pw").unwrap_or_default();
-        let data = std::fs::read(backup).map_err(|e| e.to_string())?;
-        let (out_name, bytes) = if pw.is_empty() { (name, data) } else { (format!("{name}.enc"), encrypt_bytes(&data, &pw)?) };
-        let target = dir.join(&out_name);
-        std::fs::write(&target, bytes).map_err(|e| format!("Harici yedek yazılamadı: {e}"))?;
-        // harici klasörde de son 30 yedeği tut
-        let mut files: Vec<String> = std::fs::read_dir(&dir)
-            .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.starts_with("emlak_") && (n.ends_with(".db") || n.ends_with(".db.enc"))).collect())
-            .unwrap_or_default();
-        files.sort();
-        while files.len() > 30 {
-            let old = files.remove(0);
-            let _ = std::fs::remove_file(dir.join(old));
-        }
-        Ok(Some(target))
+        let overwrite = self.kv_get("ext_backup_overwrite").map(|v| v != "0").unwrap_or(true);
+        self.copy_into(Path::new(dir.trim()), backup, overwrite).map(Some)
+    }
+
+    /// Güvenli yerel yedek (Belgeler\Emlak Ofis Yedek): zaman damgalı son 30 kopya.
+    pub fn copy_safe(&self, backup: &Path) -> Result<PathBuf, String> {
+        self.copy_into(&self.safe_backup_dir(), backup, false)
     }
 }
 

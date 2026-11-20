@@ -35,6 +35,8 @@ pub struct UserInfo {
     pub role: String,
     pub active: bool,
     pub has_photo: bool,
+    /// İki aşamalı doğrulama açık mı (yalnızca yönetici listesinde ve kendi profilinde doldurulur)
+    pub totp: bool,
 }
 
 impl UserInfo {
@@ -70,6 +72,8 @@ pub fn role_label(role: &str) -> &'static str {
 pub struct LoginReply {
     pub token: String,
     pub user: UserInfo,
+    /// Yönetici çevrimdışı giriş/yerel kopya özelliğini açtı mı
+    pub offline_ok: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -119,6 +123,9 @@ pub struct Portfolio {
     pub swap_ok: bool,
     pub credit_ok: bool,
     pub description: String,
+    /// İlan metninin İngilizce ve Rusça sürümleri (Türkçe metin `description`)
+    pub description_en: String,
+    pub description_ru: String,
     pub status: String,
     // Mülk sahibi (yalnızca yönetici okuyabilir; kayıt sırasında herkes girebilir)
     pub owner_name: String,
@@ -135,6 +142,11 @@ pub struct Portfolio {
     pub published_at: String,
     pub closed_at: String,
     pub photos: Vec<i64>,
+    /// Etiketler (Müstakil, Fırsat…)
+    pub tags: Vec<String>,
+    /// Web sitesi yayın durumu: '' | 'Bekliyor' | 'Yayında'
+    pub web_status: String,
+    pub web_at: String,
 }
 
 impl Portfolio {
@@ -194,6 +206,7 @@ pub struct CrmContact {
     pub consent: bool,
     pub consent_date: String,
     pub anonymized: bool,
+    pub has_photo: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -260,6 +273,8 @@ pub struct GoalInfo {
     pub p_published: i64,
     pub p_rented: i64,
     pub p_sold: i64,
+    pub t_web: i64,
+    pub p_web: i64,
     pub note: String,
 }
 
@@ -288,6 +303,8 @@ pub struct OutputSettings {
     pub show_agent_phone: bool,
     pub show_agent_email: bool,
     pub watermark: bool,
+    /// Antetli (önceden basılı) kağıda yazdırma: logo/ofis adı üst bilgisi basılmaz, üstte boşluk bırakılır
+    pub letterhead: bool,
 }
 
 impl Default for OutputSettings {
@@ -315,6 +332,7 @@ impl Default for OutputSettings {
             show_agent_phone: true,
             show_agent_email: true,
             watermark: false,
+            letterhead: false,
         }
     }
 }
@@ -462,3 +480,66 @@ pub fn parse_coords(text: &str) -> Option<(f64, f64)> {
     }
     None
 }
+
+/// Varsayılan hatırlatma metni. {ad}, {baslik}, {saat}, {ofis} yer tutucuları.
+pub const REMIND_DEFAULT: &str = "Merhaba {ad}, {tarih} saat {saat} için {baslik} randevunuzu hatırlatırız. — {ofis}";
+
+fn parse_ip(s: &str) -> Option<std::net::IpAddr> {
+    s.trim().parse().ok()
+}
+
+/// "192.168.1.0/24", "10.0.0.5", "::1" gibi kayıtlardan biri `ip` ile eşleşiyor mu?
+pub fn ip_matches(rule: &str, ip: std::net::IpAddr) -> bool {
+    let rule = rule.trim();
+    if let Some((net, bits)) = rule.split_once('/') {
+        let (Some(n), Ok(b)) = (parse_ip(net), bits.trim().parse::<u32>()) else { return false };
+        match (n, ip) {
+            (std::net::IpAddr::V4(n), std::net::IpAddr::V4(i)) if b <= 32 => {
+                let mask = if b == 0 { 0 } else { u32::MAX << (32 - b) };
+                u32::from(n) & mask == u32::from(i) & mask
+            }
+            (std::net::IpAddr::V6(n), std::net::IpAddr::V6(i)) if b <= 128 => {
+                let mask = if b == 0 { 0 } else { u128::MAX << (128 - b) };
+                u128::from(n) & mask == u128::from(i) & mask
+            }
+            _ => false,
+        }
+    } else {
+        parse_ip(rule).map(|r| r == ip).unwrap_or(false)
+    }
+}
+
+fn ip_rules(list: &str) -> Vec<String> {
+    list.split(|c: char| c == ',' || c == ';' || c.is_whitespace()).map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()
+}
+
+/// Geçersiz kayıtların listesi (boşsa hepsi geçerli).
+pub fn ip_allow_invalid(list: &str) -> Vec<String> {
+    ip_rules(list)
+        .into_iter()
+        .filter(|r| {
+            let ok = match r.split_once('/') {
+                Some((n, b)) => parse_ip(n).is_some() && b.trim().parse::<u32>().is_ok(),
+                None => parse_ip(r).is_some(),
+            };
+            !ok
+        })
+        .collect()
+}
+
+/// Liste boşsa herkese açık; yerel (loopback) bağlantı her zaman serbesttir.
+pub fn ip_allowed(list: &str, ip: &str) -> bool {
+    let rules = ip_rules(list);
+    if rules.is_empty() {
+        return true;
+    }
+    let Some(addr) = parse_ip(ip) else { return false };
+    let addr = match addr {
+        std::net::IpAddr::V6(v6) => v6.to_ipv4_mapped().map(std::net::IpAddr::V4).unwrap_or(addr),
+        a => a,
+    };
+    addr.is_loopback() || rules.iter().any(|r| ip_matches(r, addr))
+}
+
+/// Lisans süresi dolunca true; sunucu istekleri reddedilir.
+pub static LICENSE_LOCKED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

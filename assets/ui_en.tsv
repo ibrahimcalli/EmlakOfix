@@ -485,7 +485,224 @@ En az	At least
 Büyük resimler otomatik küçültülür (en uzun kenar 2560 px); çok küçük resimler kabul edilmez.	Large pictures are shrunk automatically (longest side 2560 px); pictures that are too small are rejected.
 Portföy, müşteri ilişkileri, mesai ve görev yönetimi — ofisinizin tüm işleri tek, güvenli ve hızlı bir çatı altında.	Portfolio, customer relations, attendance and task management — all your office work under one secure, fast roof.
 Mobil uygulamamız	Our mobile app
-Portföylerinize cebinizden de ulaşın. Android için Google Play'de.	Reach your portfolios from your pocket too. On Google Play for Android.
+Portföylerinize cebinizden de ulaşın. Android için Google Play'de yakında.	Reach your portfolios from your pocket too. Coming soon to Google Play for Android.
 Google Play'de görüntüle	View on Google Play
 Hoş geldiniz	Welcome
 Devam etmek için giriş yapın	Sign in to continue
+İki aşamalı doğrulama: telefondaki uygulamadan 6 haneli kodu girin.	Two-step verification: enter the 6-digit code from your phone app.
+Doğrulama kodu	Verification code
+İki aşamalı doğrulama	Two-step verification
+Şifreye ek olarak telefondaki doğrulama uygulamasından (Google Authenticator, Microsoft Authenticator, Aegis…) 6 haneli kod istenir. Ofis dışından erişimde önerilir.	In addition to the password, a 6-digit code from a phone authenticator app (Google Authenticator, Microsoft Authenticator, Aegis…) is required. Recommended for access from outside the office.
+✔ Açık	✔ On
+Şifreniz	Your password
+Kod	Code
+Kurulumu başlat	Start setup
+İki aşamalı doğrulama kapatıldı.	Two-step verification turned off.
+İki aşamalı doğrulama açıldı.	Two-step verification turned on.
+1) Doğrulama uygulamasında "Kurulum anahtarı gir" (hesap: bu kullanıcı, tür: zamana dayalı) seçip şu anahtarı yazın:	1) In the authenticator app choose "Enter a setup key" (account: this user, type: time-based) and type this key:
+2) Uygulamanın gösterdiği 6 haneli kodu girip etkinleştirin:	2) Enter the 6-digit code shown in the app and activate:
+Etkinleştir	Activate
+Kes	Cut
+Yapıştır	Paste
+Sil	Delete
+Çevrimdışı harita indir	Download offline map
+İnternet olmadığında da haritayı açabilmek için seçtiğiniz bölgeyi bu bilgisayara indirin.	Download the chosen area to this computer so the map also opens without internet.
+Klasör:	Folder:
+Şu an ekranda görünen alan	Area currently on screen
+En yüksek yakınlaştırma:	Maximum zoom:
+karo	tiles
+Çok büyük bir alan. Harita sağlayıcılarına yük bindirmemek için daha küçük bölgeler ve daha düşük yakınlaştırma seçin.	Very large area. Choose smaller regions and lower zoom to avoid burdening the map providers.
+İndirmeyi başlat	Start download
+Tek seferde en çok şu kadar karo indirilebilir:	Maximum tiles per download:
+İndirilemeyen karo:	Tiles not downloaded:
+İptal	Cancel
+Tamamlandı. "Çevrimdışı" modunda bu alan internetsiz açılır.	Done. This area now opens without internet in "Offline" mode.
+Çevrimdışı klasör boyutu	Offline folder size
+Haritalar OpenStreetMap ve Esri hizmetlerinden indirilir; yalnızca ofis içi kullanım için, makul miktarda indirin.	Maps are downloaded from OpenStreetMap and Esri services; for in-office use only, please download a reasonable amount.
+Harita indir…	Download map…
+Paneli göster	Show panel
+Paneli gizle	Hide panel
+Çevrimdışı mod: yalnızca bilgisayara indirilmiş haritalar gösterilir. Gri alanlar indirilmemiştir ("Harita indir…").	Offline mode: only maps downloaded to this computer are shown. Grey areas are not downloaded ("Download map…").
+2FA sıfırla	Reset 2FA
+Telefonunu kaybeden kullanıcının iki aşamalı doğrulamasını kapatır; kullanıcı yalnızca şifreyle girer ve isterse yeniden kurar.	Turns off two-step verification for a user who lost their phone; they sign in with the password only and can set it up again.
+İki aşamalı doğrulamayı sıfırla	Reset two-step verification
+iki aşamalı doğrulama kapatılacak. Önce kullanıcının kimliğinden emin olun (ör. telefonla arayın).	two-step verification will be turned off. First make sure of the user's identity (e.g. call them).
+Evet, sıfırla	Yes, reset
+İki aşamalı doğrulama sıfırlandı.	Two-step verification was reset.
+Dikkat: aşağıdaki anahtar giriş kodu DEĞİLDİR; önce telefondaki doğrulama uygulamasına eklenmelidir. Kodu uygulama üretir ve her 30 saniyede değişir.	Note: the key below is NOT the login code; add it to the authenticator app on your phone first. The app generates the code and it changes every 30 seconds.
+Telefondaki uygulamada "QR kodu tara" ile okutun.	Scan it with "Scan QR code" in the phone app.
+Okutamıyorsanız anahtarı elle girin:	If you cannot scan, enter the key manually:
+OpenStreetMap	OpenStreetMap
+Açık oturumlar	Active sessions
+Hesabınızla giriş yapılmış cihazlar. Tanımadığınız bir oturum görürseniz kapatın ve şifrenizi değiştirin.	Devices signed in to your account. If you see a session you do not recognise, close it and change your password.
+şimdi etkin	active now
+dk önce	min ago
+sa önce	h ago
+Bilinmeyen cihaz	Unknown device
+giriş:	signed in:
+(bu oturum)	(this session)
+Oturum kapatıldı.	Session closed.
+Diğer tüm oturumları kapat	Close all other sessions
+Diğer oturumlar kapatıldı.	Other sessions closed.
+Oturumlarını kapat	Close sessions
+Bu kullanıcının açık olan tüm oturumlarını sonlandırır; yeniden giriş yapması gerekir.	Ends all of this user's open sessions; they must sign in again.
+Kullanıcının oturumları kapatıldı.	The user's sessions were closed.
+Kurtarma kodlarınız — yalnızca şimdi gösterilir	Your recovery codes — shown only now
+Telefonunuzu kaybederseniz giriş ekranındaki kod kutusuna bunlardan birini yazarak girebilirsiniz. Her kod bir kez kullanılır. Yazdırıp güvenli bir yerde saklayın; kimseyle paylaşmayın.	If you lose your phone, you can sign in by typing one of these in the code box on the login screen. Each code works once. Print them and keep them somewhere safe; do not share them.
+Hepsini kopyala	Copy all
+Kaydettim, gizle	Saved, hide
+Kalan kurtarma kodu:	Recovery codes left:
+Yeni kurtarma kodları	New recovery codes
+Şifrenizi ve güncel kodu yazın; eski kodlar geçersiz olur.	Enter your password and the current code; old codes become invalid.
+123456 veya kurtarma kodu	123456 or recovery code
+Antetli kağıt (üst bilgiyi basma)	Letterhead paper (no header)
+Ofisin önceden basılı antetli kağıdına yazdıracaksanız işaretleyin: logo ve ofis adı basılmaz, üstte boşluk bırakılır.	Tick this if you print on the office's pre-printed letterhead: logo and office name are not printed and space is left at the top.
+Aylık ofis raporu	Monthly office report
+Seçilen ayın yeni portföy, kapanan iş, komisyon, randevu ve çalışan özetini; yukarıdaki logo/antet ayarlarına göre belge olarak hazırlar.	Prepares the selected month's new portfolios, closed deals, commissions, appointments and employee summary as a document, using the logo/letterhead settings above.
+Ay (YYYY-AA):	Month (YYYY-MM):
+DOCX kaydet…	Save DOCX…
+PDF kaydet…	Save PDF…
+Rapor kaydedildi:	Report saved:
+Açık pastel – Mavi	Light pastel – Blue
+Açık pastel – Yeşil	Light pastel – Green
+Açık pastel – Turuncu	Light pastel – Orange
+WhatsApp hatırlat	Remind via WhatsApp
+E-posta hatırlat	Remind via e-mail
+IP kısıtlama	IP restriction
+Boş bırakırsanız tüm bağlantılara izin verilir. Doluysa yalnızca listedeki IP/ağlardan bağlanılabilir (her satıra bir kayıt: 203.0.113.7 veya 192.168.1.0/24). Ana bilgisayarın kendisi her zaman erişebilir. DİKKAT: kendi IP'nizi listeye eklemeyi unutmayın; Tailscale kullanıyorsanız 100.64.0.0/10 ekleyin.	If left empty, all connections are allowed. If filled, only the listed IPs/networks can connect (one entry per line: 203.0.113.7 or 192.168.1.0/24). The host computer itself can always connect. WARNING: do not forget to add your own IP; if you use Tailscale, add 100.64.0.0/10.
+IP listesini kaydet	Save IP list
+Hatırlatma metni (WhatsApp / e-posta)	Reminder text (WhatsApp / e-mail)
+Randevu kartındaki 'WhatsApp hatırlat' ve 'E-posta hatırlat' düğmeleri bu metni kullanır. Yer tutucular: {ad} {baslik} {tarih} {saat} {ofis}	The 'Remind via WhatsApp' and 'Remind via e-mail' buttons on appointment cards use this text. Placeholders: {ad} {baslik} {tarih} {saat} {ofis}
+Metni kaydet	Save text
+Buton renkleri	Button colors
+Seçtiğiniz renk düğmeleri (Kaydet, Ekle…), başlıkları, seçili menüyü ve bağlantıları boyar.	The color you pick paints buttons (Save, Add…), headings, the selected menu item and links.
+Arka plan	Background
+Programın zemin rengi; kartlar, menü ve kenarlıklar buna göre uyum sağlar. Koyu bir renk seçerseniz yazılar otomatik açık renge döner.	The program's background color; cards, menu and borders adapt to it. If you choose a dark color, text switches to light automatically.
+Temayla aynı	Same as theme
+Açık gri	Light gray
+Pastel mavi	Pastel blue
+Pastel yeşil	Pastel green
+Pastel turuncu	Pastel orange
+Pastel pembe	Pastel pink
+Pastel mor	Pastel purple
+Krem	Cream
+Taş	Stone
+Gece mavisi	Midnight blue
+Siyah	Black
+Koyu yeşil	Dark green
+Resim (profil veya hatırlatıcı)	Picture (profile or reminder)
+Resmi kaldır	Remove picture
+Resim kaydedildi.	Picture saved.
+kayıt bu bilgisayarda bekliyor; bağlantı gelince otomatik gönderilecek.	record(s) waiting on this computer; they will be sent automatically when the connection returns.
+kayıt ana bilgisayara gönderilmeyi bekliyor	record(s) waiting to be sent to the host
+Bekleyen kayıtlar var	Pending records
+kayıt henüz ana bilgisayara aktarılamadı.	record(s) have not yet been transferred to the host.
+Programı şimdi kapatırsanız bu kayıtlar bu bilgisayarda saklanır ve program bir sonraki açılışta, ana bilgisayara ulaşılabildiğinde otomatik gönderilir. Bu bilgisayar silinir/değiştirilirse kayıtlar kaybolur.	If you close the program now these records stay on this computer and are sent automatically the next time the program opens and the host is reachable. If this computer is wiped or replaced, the records are lost.
+Şimdi göndermeyi dene	Try sending now
+Yine de kapat	Close anyway
+Açık kalsın	Keep open
+Ana bilgisayar kurulum kodu (yöneticiden alın):	Host setup code (get it from the administrator):
+Kodunuz yoksa 'ana bilgisayara BAĞLANSIN' seçeneğini kullanın.	If you have no code, use the 'CONNECT to the host' option.
+Ana bilgisayar kurulum kodu	Host setup code
+Yeni bir bilgisayarda 'ANA BİLGİSAYAR' modunu yalnızca bu kodla açabilirsiniz; kodsuz kurulum sadece istemci olur (kazara ikinci bir veritabanı oluşmasını önler). Kod, gizli anahtar dosyanızla (.gizli) imzalanır; anahtar bu programa kaydedilmez.	On a new computer, 'HOST' mode can only be enabled with this code; without a code the install is client-only (prevents accidentally creating a second database). The code is signed with your secret key file (.gizli); the key is not stored in this program.
+Koruma KAPALI: önce yukarıya güvenilir yayıncı (açık) anahtarını girin.	Protection is OFF: first enter the trusted publisher (public) key above.
+Geçerlilik (gün):	Validity (days):
+Not (kime/hangi ofis):	Note (for whom/which office):
+Gizli anahtar dosyasını seç ve kod üret…	Choose secret key file and generate code…
+Kodu kopyala	Copy code
+Kod kopyalandı.	Code copied.
+Kodu yalnızca ilgili kişiye iletin; süresi dolunca geçersiz olur.	Give the code only to the person concerned; it expires after the validity period.
+Güvenli yerel yedek (1. kopya)	Safe local backup (copy 1)
+Her yedek ayrıca Belgeler içindeki bu klasöre kopyalanır; program kaldırılsa/yeniden kurulsa bile silinmez. Tutulacak kopya sayısı aşağıda ayarlanır.	Every backup is also copied to this folder inside Documents; it is not deleted if the program is uninstalled/reinstalled. The number of copies kept is set below.
+Bulut / harici yedek (2. kopya, şifreli)	Cloud / external backup (copy 2, encrypted)
+Her yedek ayrıca bu klasöre kopyalanır: Google Drive/OneDrive/Dropbox eşitleme klasörü, USB bellek, NAS vb. Parola girilirse dosya şifrelenir (.db.enc), buluta güvenle koyabilirsiniz.	Every backup is also copied to this folder: Google Drive/OneDrive/Dropbox sync folder, USB stick, NAS, etc. If a password is set the file is encrypted (.db.enc), so it is safe to put in the cloud.
+Yeni yedek eskisinin üzerine yazsın (tek dosya: emlak_son_yedek)	New backup overwrites the old one (single file: emlak_son_yedek)
+
+Açıklama (ilan metni)	Description (listing text)
+Çevrimdışı giriş ve yerel veri kopyası	Offline login and local data copy
+Açıkken her kullanıcının bilgisayarı, son bilinen verileri KENDİ parolasından türetilen anahtarla şifreli saklar. Ana bilgisayar kapalıyken bile aynı parolayla giriş yapılır, kayıtlar görüntülenir, yeni işlemler kuyruğa alınır ve bağlantı gelince gönderilir. Kapatılırsa kullanıcı bilgisayarlarındaki kopyalar bir sonraki girişte silinir. Not: açık olduğunda müşteri/portföy verisinin şifreli bir kopyası çalışan bilgisayarlarında bulunur.	When enabled, each user's computer stores the last known data encrypted with a key derived from THEIR OWN password. Even when the host is off, they can log in with the same password, view records, new actions are queued and sent when the connection returns. If disabled, local copies are deleted at the next login. Note: when enabled, an encrypted copy of customer/portfolio data exists on employee computers.
+Çevrimdışı giriş ve yerel kopya açık	Offline login and local copy enabled
+Çevrimdışı oturum: ana bilgisayara ulaşılınca otomatik bağlanılacak.	Offline session: it will connect automatically when the host is reachable.
+Ana bilgisayara bağlanıldı.	Connected to the host.
+Ana bilgisayara ulaşıldı; iki aşamalı doğrulama gerektiği için çıkış yapıp yeniden giriş yapın.	The host is reachable; because two-step verification is required, log out and log in again.
+Yeni anahtar çifti üret	Generate new key pair
+Güncelleme paketini imzala…	Sign update package…
+Paket imzalandı.	Package signed.
+Geçerlilik (gün, 0 = süresiz):	Validity (days, 0 = unlimited):
+Tutulacak yedek sayısı	Number of backups to keep
+(her yedek veritabanının tam kopyasıdır; fotoğraflar çoksa küçük tutun)	(each backup is a full copy of the database; keep it small if there are many photos)
+rclone hedefi (ör. gdrive:EmlakOfisYedek)	rclone target (e.g. gdrive:EmlakOfisYedek)
+Google Drive'a doğrudan yükleme: ana bilgisayarda rclone kurup bir kez 'rclone config' ile Drive hesabınızı bağlayın; yedek parolası şarttır (veri şifreli gider).	Direct upload to Google Drive: install rclone on the host and link your Drive account once with 'rclone config'; a backup password is required (data is sent encrypted).
+
+Vazgeç / Kapat	Cancel / Close
+Listeyi göster/gizle	Show/hide list
+Sahibinden / Hepsiemlak / sosyal medya için hazır metin. Dil sekmesini seçin.	Ready-made text for listing sites / social media. Choose a language tab.
+Bu dilde açıklama girilmemiş (Düzenle > açıklama sekmeleri).	No description entered in this language (Edit > description tabs).
+Alt çizgiyi sürükleyerek açıklama alanını uzatabilirsiniz.	Drag the bottom line to lengthen the description box.
+Kurulum kodu (Ayarlar > Kurulum ve lisans kodları bölümünden yönetici üretir):	Installation code (the administrator generates it in Settings > Installation and license codes):
+Ana bilgisayar için YÖNETİCİ kodu gerekir. Kodsuz kurulum yapılamaz.	The host computer needs an ADMINISTRATOR code. Installation without a code is not possible.
+Bağlanmak için KULLANICI (veya yönetici) kodu gerekir. Kodsuz kurulum yapılamaz.	A USER (or administrator) code is needed to connect. Installation without a code is not possible.
+Lisans süresi doldu	License expired
+Bu kurulumun lisans bitiş tarihi:	License end date of this installation:
+Devam etmek için yöneticiden yeni bir kod alıp aşağıya yapıştırın. Verileriniz silinmez; kod girilince kaldığınız yerden devam edersiniz.	To continue, get a new code from the administrator and paste it below. Your data is not deleted; after entering the code you continue where you left off.
+Kodu uygula	Apply code
+Kurulum ve lisans kodları	Installation and license codes
+Her yeni kurulum bir kodla açılır: ana bilgisayar için YÖNETİCİ kodu, diğer bilgisayarlar için KULLANICI kodu. Kodsuz kurulum yapılamaz. Kodda iki ayrı süre vardır: (1) kodun kurulumda kullanılabileceği gün sayısı, (2) programın çalışabileceği gün sayısı (lisans bitiş tarihi). Lisans bitince program kilitlenir; yeni kod girilince devam eder, veri silinmez.	Every new installation is opened with a code: an ADMINISTRATOR code for the host computer, a USER code for other computers. Installation without a code is not possible. A code has two separate periods: (1) the days the code can be used for installation, (2) the days the program may run (license end date). When the license ends the program locks; entering a new code resumes it, no data is deleted.
+Bu kurulumun lisans bitişi:	License end of this installation:
+gün kaldı	days left
+Bu kurulumun lisansı: süresiz	License of this installation: unlimited
+Kod türü:	Code type:
+Yönetici (ana bilgisayar)	Administrator (host computer)
+Kullanıcı (istemci)	User (client)
+Kod kaç gün içinde kullanılabilsin (0 = süresiz):	Days the code can be used (0 = unlimited):
+Program kaç gün çalışabilsin (0 = süresiz):	Days the program may run (0 = unlimited):
+Kodu yalnızca ilgili kişiye iletin. Üretilen kod çevrimdışı geri çağrılamaz; bu yüzden 'program kaç gün çalışabilsin' sınırı asıl denetimdir.	Send the code only to the person concerned. An issued code cannot be revoked offline; therefore the 'days the program may run' limit is the real control.
+Bu kuruluma yeni/uzatılmış lisans kodu gir (yenileme):	Enter a new/extended license code for this installation (renewal):
+Uygula	Apply
+Lisans güncellendi.	License updated.
+Paneli daralt	Collapse panel
+(kayıtlı — değiştirmek için yazın)	(saved — type to change)
++ Etiket	+ Tag
+Aşağıdan seçin veya yeni kategori yazın	Pick below or type a new category
+Bağlantıyı dene	Test connection
+Başlık ve yazı metni boş olamaz.	Title and text cannot be empty.
+Cloudflare üzerinde yayınlanan siteye ilan, fotoğraf, etiket ve blog yazısı gönderir. Adres ve anahtar sitenin kurulum rehberinde yazar.	Sends listings, photos, tags and blog posts to the site published on Cloudflare. The address and key are in the site setup guide.
+Durumu yenile	Refresh status
+Etiket ekle	Add tag
+Etiketler (ilan kartında görünür)	Tags (shown on the listing card)
+Etiketler kaydedildi.	Tags saved.
+Etiketleri kaydet	Save tags
+Görsel seçilmedi	No image selected
+Görsel seç…	Choose image…
+Kısa özet (liste ve arama sonuçlarında görünür)	Short summary (shown in lists and search results)
+Onayla ve web'de yayınla	Approve and publish on the web
+Portföy kartlarında görünen etiketler. Hem programda hem sitede aynıdır; ekleyip silebilir, renk (#RRGGBB) ve İngilizce/Rusça karşılık yazabilirsiniz.	Tags shown on listing cards. They are the same in the program and on the site; you can add or delete them and set a colour (#RRGGBB) and English/Russian names.
+Site adresi:	Site address:
+Site anahtarı:	Site key:
+Son işlem:	Last action:
+Taslak olarak kaydet (yayınlama)	Save as draft (do not publish)
+Taslağı gönder	Send draft
+Tüm yayındaki ilanları yeniden gönder	Resend all published listings
+Web sitesi	Website
+Web sitesi (sahibindenfethiye.com.tr)	Website (sahibindenfethiye.com.tr)
+Web sitesi ayarları kaydedildi.	Website settings saved.
+Web sitesinde yayında değil	Not published on the website
+Web sitesinde yayında —	Published on the website —
+Web yayın durumu güncellendi.	Web publishing status updated.
+Web yayınından kaldır	Remove from the website
+Web yönetim paneline gir	Open the web admin panel
+Web'de yayında:	Live on the web:
+Web'de yayınla (onayla)	Publish on the web (approve)
+Web'de yayınlama isteği gönder	Send web publishing request
+Yayın isteğini portföy sahibi gönderir; yönetici onaylayınca ilan siteye gider ve 'Web yayını' hedefine sayılır.	The listing owner sends the request; when the administrator approves, the listing goes to the site and counts toward the 'Web publishing' goal.
+Yazı metni (boş satır = yeni paragraf; '## ' başlık; '- ' madde)	Post text (blank line = new paragraph; '## ' heading; '- ' bullet)
+Yazı web sitesine gönderildi.	Post sent to the website.
+Yazıyı doğrudan web sitesinde (sahibindenfethiye.com.tr) yayınlar. Gelişmiş düzenleme için web yönetim paneli kullanılabilir.	Publishes the post directly on the website (sahibindenfethiye.com.tr). Use the web admin panel for advanced editing.
+Yeni etiket yaz…	Type a new tag…
+Yeni yazı	New post
+Yönetici onayı bekliyor	Waiting for administrator approval
+onay bekleyen:	pending approval:
+Önce portföy durumunu 'Yayında' yapın.	First set the listing status to 'Published'.
+Blog yayınla	Publish blog
+Web yayını	Web publishing
+Web sitesinde yayına alınan ilan (adet, yönetici onaylı)	Listings published on the website (count, admin-approved)

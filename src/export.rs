@@ -23,6 +23,16 @@ pub struct ExportData {
 pub const FONT_REGULAR: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
 pub const FONT_BOLD: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold.ttf");
 
+/// Belge diline göre ilan açıklaması (boşsa Türkçe metne düşer).
+pub fn desc_for(p: &Portfolio, lg: Lang) -> &str {
+    let t = match lg {
+        Lang::En => p.description_en.trim(),
+        Lang::Ru => p.description_ru.trim(),
+        _ => "",
+    };
+    if t.is_empty() { p.description.trim() } else { t }
+}
+
 pub fn detail_rows(p: &Portfolio, lg: Lang) -> Vec<(String, String)> {
     let mut v: Vec<(String, String)> = Vec::new();
     let mut add = |k: &str, val: String| {
@@ -82,9 +92,9 @@ pub fn whatsapp_text(p: &Portfolio, s: &OutputSettings, agent: &Option<Agent>, l
     if !spec.is_empty() {
         t.push_str(&format!("{}\n", spec.join(" • ")));
     }
-    if s.show_description && !p.description.trim().is_empty() {
-        let d: String = p.description.trim().chars().take(350).collect();
-        t.push_str(&format!("\n{}{}\n", d, if p.description.trim().chars().count() > 350 { "…" } else { "" }));
+    if s.show_description && !desc_for(p, lg).is_empty() {
+        let d: String = desc_for(p, lg).chars().take(350).collect();
+        t.push_str(&format!("\n{}{}\n", d, if desc_for(p, lg).chars().count() > 350 { "…" } else { "" }));
     }
     if s.show_map_link {
         if let (Some(la), Some(lo)) = (p.lat, p.lon) {
@@ -161,8 +171,9 @@ pub fn write_pdf(d: &ExportData, path: &Path) -> Result<(), String> {
     dec.set_margins(Margins::trbl(14, 12, 14, 12));
     let office = s.office_name.clone();
     let page_word = tr(lg, "Sayfa");
+    let lh = s.letterhead;
     dec.set_header(move |page| {
-        Paragraph::new(format!("{}   |   {} {}", office, page_word, page)).aligned(Alignment::Right).styled(Style::new().with_font_size(8).with_color(Color::Rgb(130, 130, 130)))
+        Paragraph::new(if lh { format!("{} {}", page_word, page) } else { format!("{}   |   {} {}", office, page_word, page) }).aligned(Alignment::Right).styled(Style::new().with_font_size(8).with_color(Color::Rgb(130, 130, 130)))
     });
     doc.set_page_decorator(dec);
 
@@ -192,9 +203,13 @@ pub fn write_pdf(d: &ExportData, path: &Path) -> Result<(), String> {
         }
         right.push(Paragraph::new(parts.join("   •   ")).aligned(Alignment::Right).styled(Style::new().with_font_size(9).with_color(gray)));
     }
-    head.row().element(left).element(right).push().map_err(|e| e.to_string())?;
-    doc.push(head);
-    doc.push(Break::new(1.0));
+    if s.letterhead {
+        doc.push(Break::new(7.0)); // basılı antetin altına denk gelecek boşluk
+    } else {
+        head.row().element(left).element(right).push().map_err(|e| e.to_string())?;
+        doc.push(head);
+        doc.push(Break::new(1.0));
+    }
 
     // Başlık
     doc.push(Paragraph::new(p.title.clone()).styled(Style::new().bold().with_font_size(20).with_color(accent)));
@@ -265,10 +280,10 @@ pub fn write_pdf(d: &ExportData, path: &Path) -> Result<(), String> {
         doc.push(Break::new(0.4));
     }
 
-    if s.show_description && !p.description.trim().is_empty() {
+    if s.show_description && !desc_for(p, lg).is_empty() {
         doc.push(Paragraph::new(tr(lg, "Açıklama")).styled(Style::new().bold().with_font_size(13).with_color(accent)));
         doc.push(Break::new(0.3));
-        for line in p.description.trim().lines() {
+        for line in desc_for(p, lg).lines() {
             doc.push(Paragraph::new(line.to_string()));
         }
         doc.push(Break::new(0.8));
@@ -366,15 +381,22 @@ pub fn write_docx(d: &ExportData, path: &Path) -> Result<(), String> {
     let mut docx = Docx::new().page_margin(PageMargin::new().top(700).bottom(700).left(800).right(800));
 
     // Üst bilgi
-    if s.show_logo {
+    if s.letterhead {
+        for _ in 0..5 {
+            docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_text(" ")));
+        }
+    }
+    if s.show_logo && !s.letterhead {
         if let Some(l) = &d.logo {
             if let Some(pc) = pic(l, 4.0, 2.5) {
                 docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_image(pc)));
             }
         }
     }
-    docx = docx.add_paragraph(Paragraph::new().add_run(text(&s.office_name, 30, true, &accent)));
-    if !s.tagline.trim().is_empty() {
+    if !s.letterhead {
+        docx = docx.add_paragraph(Paragraph::new().add_run(text(&s.office_name, 30, true, &accent)));
+    }
+    if !s.tagline.trim().is_empty() && !s.letterhead {
         docx = docx.add_paragraph(Paragraph::new().add_run(text(&s.tagline, 18, false, "666666")));
     }
     let mut meta = Vec::new();
@@ -436,9 +458,9 @@ pub fn write_docx(d: &ExportData, path: &Path) -> Result<(), String> {
     if s.show_address && !p.address.trim().is_empty() {
         docx = docx.add_paragraph(Paragraph::new().add_run(text(&lbl(lg, "Adres", &p.address.trim()), 20, false, "000000")));
     }
-    if s.show_description && !p.description.trim().is_empty() {
+    if s.show_description && !desc_for(p, lg).is_empty() {
         docx = docx.add_paragraph(Paragraph::new().add_run(text(&tr(lg, "Açıklama"), 26, true, &accent)));
-        for line in p.description.trim().lines() {
+        for line in desc_for(p, lg).lines() {
             docx = docx.add_paragraph(Paragraph::new().add_run(text(line, 20, false, "000000")));
         }
     }

@@ -28,6 +28,18 @@ pub struct MapState {
     pub show_rent: bool,
     pub show_land: bool,
     pub labels: bool,
+    /// Çevrimdışı harita indirme penceresi
+    pub off_open: bool,
+    pub seeding: bool,
+    pub seed_tried: bool,
+    pub off_region: usize,
+    /// 0 = bölgenin kendi en yüksek yakınlaştırması, aksi halde seçilen
+    pub off_zmax: u32,
+    pub off_street: bool,
+    pub off_view: bool,
+    pub job: Option<std::sync::Arc<crate::map_tiles::Job>>,
+    pub view_bbox: (f64, f64, f64, f64),
+    pub view_z: u32,
 }
 
 /// Haritada işaret türü: 0 satılık, 1 kiralık, 2 arazi
@@ -99,7 +111,7 @@ impl App {
             m.show_rent = true;
             m.show_land = true;
             m.labels = true;
-            m.src = 0;
+            m.src = 1; // uydu varsayılan
         }
         let my_id = self.me.id;
         let total = self.ext.map_pts.len();
@@ -131,7 +143,17 @@ impl App {
                     m.src = i as u8;
                 }
             }
+            if m.src == 2 && ui.button(format!("⬇ {}", ti("Harita indir…"))).clicked() {
+                m.off_open = true;
+            }
+            ui.separator();
+            let hidden = self.cfg.map_side_hidden;
+            if ui.button(if hidden { format!("◀ {}", ti("Paneli göster")) } else { format!("▶ {}", ti("Paneli gizle")) }).clicked() {
+                self.cfg.map_side_hidden = !hidden;
+                self.cfg.save();
+            }
         });
+        self.offline_window(ui.ctx());
         if refit {
             self.ext.map.init = false;
         }
@@ -173,7 +195,7 @@ impl App {
         }
         ui.label(RichText::new(ti("Sürükleyerek kaydırın, fare tekerleğiyle yakınlaştırın. Noktaya tıklayın. Harita karoları internetten indirilir ve bilgisayarda saklanır (çevrimdışıyken daha önce görülen alanlar açılır).")).small().color(muted()));
         ui.horizontal_top(|ui| {
-            let w = (ui.available_width() - 300.0).max(300.0);
+            let w = (ui.available_width() - if self.cfg.map_side_hidden { 0.0 } else { 300.0 }).max(300.0);
             let (rect, resp) = ui.allocate_exact_size(vec2(w, ui.available_height() - 6.0), Sense::click_and_drag());
             let m = &mut self.ext.map;
             // Web Mercator: dünya piksel boyutu = 256 * 2^z
@@ -203,8 +225,9 @@ impl App {
             let p = ui.painter_at(rect);
             p.rect_filled(rect, CornerRadius::same(8), thumb_bg());
             p.rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.0_f32, stroke()), egui::StrokeKind::Inside);
-            if m.src < 2 {
-                let src = if m.src == 0 { Source::Street } else { Source::Satellite };
+            {
+                m.store.offline_only = m.src == 2;
+                let src = if m.src == 0 || (m.src == 2 && m.off_street) { Source::Street } else { Source::Satellite };
                 m.store.poll(ui.ctx());
                 let zi = (m.z.round() as i32).clamp(3, 18) as u32;
                 let k = 2f64.powf(m.z - zi as f64); // karo ölçeği (1 ≈ 256 px)
@@ -223,6 +246,21 @@ impl App {
                             tp.image(id, tr, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), egui::Color32::WHITE);
                         } else {
                             tp.rect_filled(tr, 0.0, thumb_bg());
+                            // çevrimdışıyken indirilmiş daha düşük yakınlaştırmadaki karoyu büyüterek göster
+                            if m.src == 2 {
+                                for d in 1..=3u32 {
+                                    if zi < d {
+                                        break;
+                                    }
+                                    let (pz, px, py) = (zi - d, txw >> d, (ty as u32) >> d);
+                                    if let Some(id) = m.store.get(ui.ctx(), src, pz, px, py) {
+                                        let f = (1u32 << d) as f32;
+                                        let (ox, oy) = ((txw - (px << d)) as f32 / f, ((ty as u32) - (py << d)) as f32 / f);
+                                        tp.image(id, tr, egui::Rect::from_min_max(egui::pos2(ox, oy), egui::pos2(ox + 1.0 / f, oy + 1.0 / f)), egui::Color32::WHITE);
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -231,8 +269,18 @@ impl App {
                 let ar = egui::Rect::from_min_size(rect.right_bottom() - g.size() - vec2(10.0, 8.0), g.size() + vec2(8.0, 4.0));
                 tp.rect_filled(ar, CornerRadius::same(3), egui::Color32::from_white_alpha(200));
                 tp.galley(ar.min + vec2(4.0, 2.0), g, egui::Color32::from_gray(40));
-                if m.store.net_errors > 4 {
-                    tp.text(rect.left_top() + vec2(10.0, 10.0), egui::Align2::LEFT_TOP, "Harita karoları indirilemedi (internet yok?). Daha önce görülen alanlar önbellekten açılır.", FontId::proportional(12.0), egui::Color32::from_rgb(190, 55, 55));
+                // görünen alanın sınırları (çevrimdışı indirme için)
+                {
+                    let (w0, n0) = tiles::tile_to_lonlat((cwx - rect.width() as f64 / 2.0) / (256.0 * 2f64.powf(m.z)), (cwy - rect.height() as f64 / 2.0) / (256.0 * 2f64.powf(m.z)), 0.0);
+                    let (e0, s0) = tiles::tile_to_lonlat((cwx + rect.width() as f64 / 2.0) / (256.0 * 2f64.powf(m.z)), (cwy + rect.height() as f64 / 2.0) / (256.0 * 2f64.powf(m.z)), 0.0);
+                    m.view_bbox = (w0, s0, e0, n0);
+                    m.view_z = zi;
+                }
+                if m.src == 2 {
+                    tp.text(rect.left_top() + vec2(10.0, 10.0), egui::Align2::LEFT_TOP, ti("Çevrimdışı mod: yalnızca bilgisayara indirilmiş haritalar gösterilir. Gri alanlar indirilmemiştir (\"Harita indir…\")."), FontId::proportional(12.0), egui::Color32::from_rgb(240, 200, 80));
+                }
+                if m.src != 2 && m.store.net_errors > 4 {
+                    tp.text(rect.left_top() + vec2(10.0, 10.0), egui::Align2::LEFT_TOP, format!("Harita karoları indirilemedi ({}). Daha önce görülen alanlar önbellekten açılır.", m.store.last_err), FontId::proportional(12.0), egui::Color32::from_rgb(190, 55, 55));
                 }
             }
             let mut hit: Option<i64> = None;
@@ -277,7 +325,19 @@ impl App {
             if let Some(h) = hit {
                 m.sel = h;
             }
+            if self.cfg.map_side_hidden {
+                let br = egui::Rect::from_min_size(egui::pos2(rect.max.x - 130.0, rect.min.y + 8.0), vec2(122.0, 26.0));
+                if ui.put(br, egui::Button::new(format!("◀ {}", ti("Paneli göster")))).clicked() {
+                    self.cfg.map_side_hidden = false;
+                    self.cfg.save();
+                }
+                return;
+            }
             ui.vertical(|ui| {
+                if ui.small_button(format!("▶ {}", ti("Paneli daralt"))).clicked() {
+                    self.cfg.map_side_hidden = true;
+                    self.cfg.save();
+                }
                 let sel = pts.iter().find(|x| ji(x, "id") == self.ext.map.sel).cloned();
                 panel_box(ui, ti("Seçili portföy"), "", |ui| match &sel {
                     None => {

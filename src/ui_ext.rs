@@ -176,7 +176,15 @@ pub struct AnnForm {
 
 #[derive(Default, Clone)]
 pub struct ExtSetEdit {
+    pub ip_allow: String,
+    pub offline_enabled: bool,
+    pub remind_wa: String,
     pub dir: String,
+    pub safe_dir: String,
+    pub keep: i64,
+    pub rclone: String,
+    pub rclone_status: String,
+    pub overwrite: bool,
     pub pw: String,
     pub clear_pw: bool,
     pub pw_set: bool,
@@ -193,6 +201,8 @@ pub struct ExtState {
     pub buyer_form: Option<BuyerForm>,
     pub buyer_matches: Vec<Value>,
     pub buyer_sel: i64,
+    pub buyer_list_w: f32,
+    pub buyer_list_hidden: bool,
     pub appts: Vec<Value>,
     pub cal_month: NaiveDate,
     pub cal_sel: NaiveDate,
@@ -228,6 +238,11 @@ pub struct ExtState {
     pub restore_pick: Option<std::path::PathBuf>,
     pub born: std::time::Instant,
     pub verify_pending: bool,
+    pub host_code: String,
+    pub host_days: u32,
+    pub host_note: String,
+    pub code_kind: u8,
+    pub lic_days: u32,
     pub upd_banner_hidden: bool,
     pub upd_pkg: Option<crate::updater::Package>,
 }
@@ -244,6 +259,8 @@ impl ExtState {
             buyer_form: None,
             buyer_matches: vec![],
             buyer_sel: 0,
+            buyer_list_w: 300.0,
+            buyer_list_hidden: false,
             appts: vec![],
             cal_month: first,
             cal_sel: today,
@@ -279,6 +296,11 @@ impl ExtState {
             restore_pick: None,
             born: std::time::Instant::now(),
             verify_pending: true,
+            host_code: String::new(),
+            host_days: 7,
+            host_note: String::new(),
+            code_kind: 0,
+            lic_days: 365,
             upd_banner_hidden: false,
             upd_pkg: None,
         }
@@ -601,7 +623,12 @@ impl App {
             .collect();
         let mut select: Option<Value> = None;
         ui.horizontal_top(|ui| {
-            ui.allocate_ui_with_layout(vec2(370.0, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
+            if ui.small_button(if self.ext.buyer_list_hidden { "▶" } else { "◀" }).on_hover_text(ti("Listeyi göster/gizle")).clicked() {
+                self.ext.buyer_list_hidden = !self.ext.buyer_list_hidden;
+            }
+            if !self.ext.buyer_list_hidden {
+            let lw = self.ext.buyer_list_w.clamp(220.0, 520.0);
+            ui.allocate_ui_with_layout(vec2(lw, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
                 egui::ScrollArea::vertical().id_salt("buyer_list").auto_shrink([false, false]).show(ui, |ui| {
                     if list.is_empty() {
                         ui.label(RichText::new(ti("Kayıtlı alıcı yok.")).color(muted()));
@@ -647,9 +674,18 @@ impl App {
                     }
                 });
             });
-            ui.separator();
+            // sürükleyerek liste genişliğini ayarla
+            let (hr, hresp) = ui.allocate_exact_size(vec2(8.0, ui.available_height().max(100.0)), Sense::drag());
+            ui.painter().rect_filled(egui::Rect::from_center_size(hr.center(), vec2(2.0, hr.height())), 1.0, if hresp.hovered() || hresp.dragged() { accent() } else { stroke() });
+            if hresp.hovered() || hresp.dragged() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+            }
+            if hresp.dragged() {
+                self.ext.buyer_list_w = (self.ext.buyer_list_w + hresp.drag_delta().x).clamp(220.0, 520.0);
+            }
+            }
             ui.vertical(|ui| {
-                egui::ScrollArea::vertical().id_salt("buyer_form").auto_shrink([false, false]).show(ui, |ui| self.buyer_form_ui(ui));
+                egui::ScrollArea::both().id_salt("buyer_form").auto_shrink([false, false]).show(ui, |ui| self.buyer_form_ui(ui));
             });
         });
         if let Some(b) = select {
@@ -728,9 +764,12 @@ impl App {
             });
             ui.add_space(6.0);
             let mut act: u8 = 0;
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if primary(ui, ti("Kaydet")) {
                     act = 1;
+                }
+                if ui.button(ti("Vazgeç / Kapat")).clicked() {
+                    act = 7;
                 }
                 if f.id > 0 {
                     if ui.button(ti("Randevu ekle")).clicked() {
@@ -751,6 +790,11 @@ impl App {
                 }
             });
             match act {
+                7 => {
+                    self.ext.buyer_sel = 0;
+                    self.ext.buyer_matches.clear();
+                    f.id = i64::MIN; // formu kapat işareti (aşağıda)
+                }
                 1 => {
                     if f.full_name.trim().is_empty() {
                         self.err(ti("Alıcı adı boş olamaz."));
@@ -855,7 +899,7 @@ impl App {
                 }
             });
         }
-        self.ext.buyer_form = Some(f);
+        self.ext.buyer_form = if f.id == i64::MIN { None } else { Some(f) };
     }
 
     // ------------------------------------------------------------ TAKVİM
@@ -892,9 +936,20 @@ impl App {
             });
             ui.separator();
             ui.vertical(|ui| {
+                let pw = (ui.available_width() - 8.0).max(260.0);
+                ui.set_min_width(pw);
+                ui.set_max_width(pw);
                 egui::ScrollArea::vertical().id_salt("cal_day").auto_shrink([false, false]).show(ui, |ui| self.calendar_day(ui, &appts));
             });
         });
+    }
+
+    fn readable_on(bg: Color32) -> Color32 {
+        let base = card();
+        let al = bg.a() as f32 / 255.0;
+        let mix = |x: u8, y: u8| x as f32 * al + y as f32 * (1.0 - al);
+        let l = 0.299 * mix(bg.r(), base.r()) + 0.587 * mix(bg.g(), base.g()) + 0.114 * mix(bg.b(), base.b());
+        if l > 150.0 { Color32::from_rgb(28, 28, 32) } else { Color32::from_rgb(245, 245, 248) }
     }
 
     fn calendar_grid(&mut self, ui: &mut Ui, appts: &[Value]) {
@@ -923,17 +978,20 @@ impl App {
                 let bg = if sel { nav_sel_soft() } else if resp.hovered() { card_hover() } else if in_month { card() } else { thumb_bg() };
                 p.rect_filled(rect, CornerRadius::same(6), bg);
                 p.rect_stroke(rect, CornerRadius::same(6), Stroke::new(if d == today { 2.0_f32 } else { 1.0_f32 }, if d == today { accent() } else { stroke() }), egui::StrokeKind::Inside);
-                p.text(rect.min + vec2(6.0, 4.0), Align2::LEFT_TOP, d.day().to_string(), FontId::proportional(13.0), if in_month { t_strong() } else { t_dim() });
+                let fg = Self::readable_on(bg);
+                let fg_dim = fg.gamma_multiply(0.65);
+                p.text(rect.min + vec2(6.0, 4.0), Align2::LEFT_TOP, d.day().to_string(), FontId::proportional(13.0), if in_month { fg } else { fg_dim });
                 let key = d.format("%Y-%m-%d").to_string();
                 let day: Vec<&Value> = appts.iter().filter(|a| js(a, "start_at").starts_with(&key) && js(a, "status") != "İptal").collect();
                 for (i, a) in day.iter().take(3).enumerate() {
-                    let col = if js(a, "status") == "Tamamlandı" { t_dim() } else { accent() };
+                    let col = if js(a, "status") == "Tamamlandı" { fg_dim } else { fg };
                     let line = format!("{} {}", js(a, "start_at").get(11..16).unwrap_or(""), js(a, "title"));
                     let galley = p.layout(line, FontId::proportional(11.0), col, f32::INFINITY);
-                    p.with_clip_rect(rect.shrink(2.0)).galley(rect.min + vec2(6.0, 22.0 + i as f32 * 14.0), galley, col);
+                    p.circle_filled(rect.min + vec2(8.0, 29.0 + i as f32 * 14.0), 2.5, accent());
+                    p.with_clip_rect(rect.shrink(2.0)).galley(rect.min + vec2(15.0, 22.0 + i as f32 * 14.0), galley, col);
                 }
                 if day.len() > 3 {
-                    p.text(rect.min + vec2(6.0, 22.0 + 3.0 * 14.0), Align2::LEFT_TOP, format!("+{} daha", day.len() - 3), FontId::proportional(10.5), muted());
+                    p.text(rect.min + vec2(6.0, 22.0 + 3.0 * 14.0), Align2::LEFT_TOP, format!("+{} daha", day.len() - 3), FontId::proportional(10.5), fg_dim);
                 }
                 if resp.clicked() {
                     clicked = Some(d);
@@ -951,7 +1009,7 @@ impl App {
 
     fn calendar_day(&mut self, ui: &mut Ui, appts: &[Value]) {
         let day = self.ext.cal_sel;
-        ui.label(RichText::new(format!("{} {} {}", day.day(), MONTHS_TR[(day.month() - 1) as usize], DAYS_TR[day.weekday().num_days_from_monday() as usize])).size(18.0).strong().color(accent()));
+        ui.label(RichText::new(format!("{} {} {}", day.day(), MONTHS_TR[(day.month() - 1) as usize], DAYS_TR[day.weekday().num_days_from_monday() as usize])).size(18.0).strong().color(t_strong()));
         if let Some(f) = self.ext.appt_form.clone() {
             self.appt_form_ui(ui, f);
             return;
@@ -977,7 +1035,7 @@ impl App {
                 ui.label(RichText::new(js(a, "title")).strong());
                 ui.label(RichText::new(format!("{} • {}", js(a, "kind"), js(a, "user_name"))).small().color(muted()));
                 if !js(a, "portfolio_title").is_empty() {
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(RichText::new(format!("Portföy: {}", js(a, "portfolio_title"))).small());
                         if ui.small_button(ti("Aç")).clicked() {
                             self.open_detail(ji(a, "portfolio_id"));
@@ -985,13 +1043,24 @@ impl App {
                     });
                 }
                 if !js(a, "buyer_name").is_empty() {
-                    ui.label(RichText::new(format!("Alıcı: {}", js(a, "buyer_name"))).small());
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new(format!("Alıcı: {}", js(a, "buyer_name"))).small());
+                        let msg = self.remind_text(a);
+                        let wa = crate::common::wa_number(&js(a, "buyer_phone"));
+                        if !wa.is_empty() && ui.small_button(ti("WhatsApp hatırlat")).clicked() {
+                            self.open_url(&format!("https://wa.me/{}?text={}", wa, crate::common::url_encode(&msg)));
+                        }
+                        if !js(a, "buyer_email").is_empty() && ui.small_button(ti("E-posta hatırlat")).clicked() {
+                            let subj = format!("Randevu hatırlatma: {}", js(a, "title"));
+                            self.open_url(&format!("mailto:{}?subject={}&body={}", js(a, "buyer_email"), crate::common::url_encode(&subj), crate::common::url_encode(&msg)));
+                        }
+                    });
                 }
                 if !js(a, "note").is_empty() {
-                    ui.label(RichText::new(js(a, "note")).small().color(t_mid()));
+                    ui.add(egui::Label::new(RichText::new(js(a, "note")).small().color(t_mid())).wrap());
                 }
                 if can {
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         if js(a, "status") == "Planlı" && ui.small_button(ti("✓ Tamamla")).clicked() {
                             status = Some((id, "Tamamlandı"));
                         }
@@ -1261,4 +1330,17 @@ pub fn dashboard_csv(d: &Value) -> String {
         }
     }
     s
+}
+
+impl App {
+    /// Randevu hatırlatma metni (ayarlardaki şablondan).
+    pub fn remind_text(&self, a: &Value) -> String {
+        let tpl = if self.ext.ext_set.remind_wa.trim().is_empty() { crate::common::REMIND_DEFAULT.to_string() } else { self.ext.ext_set.remind_wa.clone() };
+        let st = js(a, "start_at");
+        tpl.replace("{ad}", &js(a, "buyer_name"))
+            .replace("{baslik}", &js(a, "title"))
+            .replace("{tarih}", st.get(0..10).unwrap_or(""))
+            .replace("{saat}", st.get(11..16).unwrap_or(""))
+            .replace("{ofis}", &self.settings.office_name)
+    }
 }

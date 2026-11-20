@@ -115,8 +115,7 @@ impl App {
 
         self.bg_section(ui, &mut look);
 
-        section(ui, ti("Renkler"), ti("Ana renk başlıkları, seçili menüyü ve bağlantıları; buton rengi ana düğmeleri (Kaydet, Ekle…) boyar."), |ui| {
-            ui.label(RichText::new(ti("Ana renk")).strong());
+        section(ui, ti("Buton renkleri"), ti("Seçtiğiniz renk düğmeleri (Kaydet, Ekle…), başlıkları, seçili menüyü ve bağlantıları boyar."), |ui| {
             ui.horizontal_wrapped(|ui| {
                 for (name, hex) in theme::PRESETS {
                     if swatch(ui, theme::parse_hex(hex).unwrap(), look.accent.eq_ignore_ascii_case(hex), name) {
@@ -129,22 +128,23 @@ impl App {
                 }
                 ui.label(RichText::new(look.accent.clone()).small().color(muted()));
             });
-            ui.add_space(8.0);
-            ui.label(RichText::new(ti("Buton rengi")).strong());
+        });
+
+        section(ui, ti("Arka plan"), ti("Programın zemin rengi; kartlar, menü ve kenarlıklar buna göre uyum sağlar. Koyu bir renk seçerseniz yazılar otomatik açık renge döner."), |ui| {
             ui.horizontal_wrapped(|ui| {
-                let same = look.button.is_empty();
-                if ui.selectable_label(same, ti("Ana renkle aynı")).clicked() {
-                    look.button.clear();
+                let none = look.surface.is_empty();
+                if ui.selectable_label(none, ti("Temayla aynı")).clicked() {
+                    look.surface.clear();
                 }
-                for (name, hex) in theme::PRESETS {
-                    if swatch(ui, theme::parse_hex(hex).unwrap(), !same && look.button.eq_ignore_ascii_case(hex), name) {
-                        look.button = hex.to_string();
+                for (name, hex) in theme::SURFACES {
+                    if swatch(ui, theme::parse_hex(hex).unwrap(), look.surface.eq_ignore_ascii_case(hex), name) {
+                        look.surface = hex.to_string();
                     }
                 }
-                let cur = theme::parse_hex(if same { &look.accent } else { &look.button }).map(|c| [c.r(), c.g(), c.b()]).unwrap_or([31, 78, 121]);
+                let cur = theme::parse_hex(&look.surface).map(|c| [c.r(), c.g(), c.b()]).unwrap_or([243, 245, 249]);
                 let mut rgb = cur;
                 if ui.color_edit_button_srgb(&mut rgb).on_hover_text(ti("Özel renk seç")).changed() {
-                    look.button = theme::to_hex(Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                    look.surface = theme::to_hex(Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
                 }
             });
         });

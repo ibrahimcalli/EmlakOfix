@@ -12,9 +12,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+/// Hesap kilidi: bu kadar hatalı denemeden sonra LOCK_WINDOW süre kilitlenir.
+pub const MAX_FAILS: u32 = 8;
+pub const LOCK_WINDOW: Duration = Duration::from_secs(10 * 60);
+
 pub struct State {
     pub db: Mutex<Db>,
     pub sessions: Mutex<HashMap<String, (i64, Instant)>>,
+    /// Kullanıcı adı -> (art arda hatalı deneme, ilk hata zamanı): kaba kuvvet koruması
+    /// Oturum bilgisi: belirteç -> (ip, cihaz, açılış zamanı)
+    pub sess_meta: Mutex<HashMap<String, (String, String, String)>>,
+    pub fails: Mutex<HashMap<String, (u32, Instant)>>,
     pub rev: AtomicU64,
     pub port: u16,
     pub data_dir: PathBuf,
@@ -102,6 +110,8 @@ pub fn start_with(data_dir: PathBuf, port: u16, https: bool) -> Result<Arc<State
     let state = Arc::new(State {
         db: Mutex::new(db),
         sessions: Mutex::new(HashMap::new()),
+        sess_meta: Mutex::new(HashMap::new()),
+        fails: Mutex::new(HashMap::new()),
         rev: AtomicU64::new(chrono::Local::now().timestamp() as u64),
         port,
         data_dir,
@@ -169,6 +179,10 @@ fn url_decode(s: &str) -> String {
 }
 
 fn handle_request(st: &State, mut req: tiny_http::Request) {
+    if crate::common::LICENSE_LOCKED.load(std::sync::atomic::Ordering::Relaxed) {
+        let _ = req.respond(tiny_http::Response::from_string("Lisans suresi doldu").with_status_code(423));
+        return;
+    }
     let method = req.method().as_str().to_uppercase();
     let url = req.url().to_string();
     let (path, query_s) = match url.split_once('?') {
@@ -179,6 +193,27 @@ fn handle_request(st: &State, mut req: tiny_http::Request) {
     for kv in query_s.split('&') {
         if let Some((k, v)) = kv.split_once('=') {
             query.insert(url_decode(k), url_decode(v));
+        }
+    }
+    query.insert("_ip".to_string(), req.remote_addr().map(|a| a.ip().to_string()).unwrap_or_default());
+    query.insert("_ua".to_string(), header(&req, "User-Agent").unwrap_or_default());
+    if let Some(off) = header(&req, "X-Offline-At") {
+        query.insert("_off".to_string(), off);
+    }
+    {
+        let ip = query.get("_ip").cloned().unwrap_or_default();
+        let allow = st.db.lock().ok().and_then(|d| d.kv_get("ip_allow")).unwrap_or_default();
+        if !crate::common::ip_allowed(&allow, &ip) && path != "/api/ping" {
+            let data = serde_json::to_vec(&json!({"error": "Bu IP adresinden erişime izin verilmiyor."})).unwrap_or_default();
+            let resp = tiny_http::Response::new(
+                tiny_http::StatusCode(403),
+                vec![tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json; charset=utf-8"[..]).unwrap()],
+                Cursor::new(data.clone()),
+                Some(data.len()),
+                None,
+            );
+            let _ = req.respond(resp);
+            return;
         }
     }
     let token = header(&req, "Authorization").map(|v| v.trim_start_matches("Bearer ").trim().to_string());
@@ -204,6 +239,38 @@ fn handle_request(st: &State, mut req: tiny_http::Request) {
     );
     resp.add_header(tiny_http::Header::from_bytes(&b"Cache-Control"[..], &b"no-store"[..]).unwrap());
     let _ = req.respond(resp);
+}
+
+/// Kurtarma kodunu doğrular ve kullanılmış olarak siler (tek kullanım).
+fn use_recovery(db: &Db, uid: i64, code: &str) -> bool {
+    let n = crate::totp::norm_recovery(code);
+    if n.len() != 10 {
+        return false;
+    }
+    let key = format!("totp_rc_{uid}");
+    let h = crate::totp::hash_recovery(&n);
+    let list = db.kv_get(&key).unwrap_or_default();
+    let mut v: Vec<&str> = list.split(',').filter(|x| !x.is_empty()).collect();
+    if let Some(i) = v.iter().position(|x| *x == h) {
+        v.remove(i);
+        let _ = db.kv_set(&key, &v.join(","));
+        db.audit(uid, "", "2FA kurtarma kodu kullanıldı", &format!("{} kod kaldı", v.len()));
+        true
+    } else {
+        false
+    }
+}
+
+fn make_recovery(db: &Db, uid: i64) -> R<Vec<String>> {
+    let codes = crate::totp::new_recovery_codes();
+    db.kv_set(&format!("totp_rc_{uid}"), &codes.iter().map(|c| crate::totp::hash_recovery(c)).collect::<Vec<_>>().join(","))?;
+    Ok(codes)
+}
+
+/// Oturum belirtecinin güvenle gösterilebilen kısa kimliği
+fn sess_id(tok: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(tok.as_bytes()).iter().take(6).map(|b| format!("{b:02x}")).collect()
 }
 
 fn new_token() -> String {
@@ -288,12 +355,53 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
             let v: Value = parse(&body)?;
             let uname = v["username"].as_str().unwrap_or("");
             let pw = v["password"].as_str().unwrap_or("");
+            let fkey = uname.trim().to_lowercase();
+            {
+                let mut f = st.fails.lock().unwrap();
+                f.retain(|_, (_, t)| t.elapsed() < LOCK_WINDOW);
+                if let Some((n, t)) = f.get(&fkey) {
+                    if *n >= MAX_FAILS {
+                        let left = LOCK_WINDOW.saturating_sub(t.elapsed()).as_secs() / 60 + 1;
+                        return Err(ApiErr(429, format!("Çok fazla hatalı deneme. Güvenlik için bu hesap yaklaşık {left} dakika kilitlendi.")));
+                    }
+                }
+            }
             if let Some((u, hash)) = db.user_login_row(uname)? {
                 if u.active && verify_password(pw, &hash) {
+                    if db.kv_get(&format!("totp_on_{}", u.id)).as_deref() == Some("1") {
+                        let code = v["code"].as_str().unwrap_or("").trim();
+                        if code.is_empty() {
+                            return Err(ApiErr(401, "2FA_GEREKLI".into()));
+                        }
+                        let sec = db.kv_get(&format!("totp_{}", u.id)).unwrap_or_default();
+                        if !crate::totp::verify(&sec, code) && !use_recovery(&db, u.id, code) {
+                            let mut f = st.fails.lock().unwrap();
+                            let e = f.entry(fkey.clone()).or_insert((0, Instant::now()));
+                            e.0 += 1;
+                            e.1 = Instant::now();
+                            drop(f);
+                            std::thread::sleep(Duration::from_millis(600));
+                            return Err(ApiErr(401, "Doğrulama kodu hatalı.".into()));
+                        }
+                    }
                     let tok = new_token();
+                    st.fails.lock().unwrap().remove(&fkey);
                     st.sessions.lock().unwrap().insert(tok.clone(), (u.id, Instant::now()));
-                    db.audit(u.id, &u.full_name(), "Giriş", "");
-                    return ok_json(&LoginReply { token: tok, user: u });
+                    st.sess_meta.lock().unwrap().insert(tok.clone(), (q.get("_ip").cloned().unwrap_or_default(), q.get("_ua").cloned().unwrap_or_default(), crate::common::now_str()));
+                    db.audit(u.id, &u.full_name(), "Giriş", &format!("{}", q.get("_ip").cloned().unwrap_or_default()));
+                    let offline_ok = db.kv_get("offline_enabled").map(|v| v == "1").unwrap_or(false);
+                    return ok_json(&LoginReply { token: tok, user: u, offline_ok });
+                }
+            }
+            {
+                let mut f = st.fails.lock().unwrap();
+                let e = f.entry(fkey).or_insert((0, Instant::now()));
+                if e.0 == 0 {
+                    e.1 = Instant::now();
+                }
+                e.0 += 1;
+                if e.0 == MAX_FAILS {
+                    e.1 = Instant::now();
                 }
             }
             std::thread::sleep(Duration::from_millis(600));
@@ -303,6 +411,11 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
     }
 
     let me = auth(st, db, &token)?;
+    if let Some(off) = q.get("_off") {
+        if method != "GET" {
+            db.audit(me.id, &me.full_name(), "Çevrimdışı kuyruktan işlendi", &format!("{} {} (kayıt zamanı {})", method, path, off));
+        }
+    }
 
     match (method, segs.as_slice()) {
         ("POST", ["api", "logout"]) => {
@@ -326,6 +439,103 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
             db.set_password(me.id, v["new"].as_str().unwrap_or(""))?;
             done()
         }
+        ("GET", ["api", "me", "sessions"]) => {
+            let cur = token.clone().unwrap_or_default();
+            let sess = st.sessions.lock().unwrap();
+            let meta = st.sess_meta.lock().unwrap();
+            let mut v: Vec<Value> = sess
+                .iter()
+                .filter(|(_, (uid, last))| *uid == me.id && last.elapsed() < Duration::from_secs(12 * 3600))
+                .map(|(t, (_, last))| {
+                    let (ip, ua, created) = meta.get(t).cloned().unwrap_or_default();
+                    json!({"id": sess_id(t), "ip": ip, "device": ua, "created": created, "idle_secs": last.elapsed().as_secs(), "current": *t == cur})
+                })
+                .collect();
+            v.sort_by_key(|x| x["idle_secs"].as_u64().unwrap_or(0));
+            Ok(Resp::Json(json!(v)))
+        }
+        ("DELETE", ["api", "me", "sessions", id]) => {
+            let mut sess = st.sessions.lock().unwrap();
+            let mine: Vec<String> = sess.iter().filter(|(t, (uid, _))| *uid == me.id && sess_id(t) == *id).map(|(t, _)| t.clone()).collect();
+            for t in &mine {
+                sess.remove(t);
+                st.sess_meta.lock().unwrap().remove(t);
+            }
+            drop(sess);
+            aud(db, &me, "Oturum kapatıldı", "");
+            done()
+        }
+        ("POST", ["api", "me", "sessions", "others"]) => {
+            let cur = token.clone().unwrap_or_default();
+            st.sessions.lock().unwrap().retain(|t, (uid, _)| *uid != me.id || *t == cur);
+            st.sess_meta.lock().unwrap().retain(|t, _| *t == cur || st.sessions.lock().map(|s| s.contains_key(t)).unwrap_or(false));
+            aud(db, &me, "Diğer oturumlar kapatıldı", "");
+            done()
+        }
+        ("DELETE", ["api", "users", id, "sessions"]) => {
+            need_admin(&me)?;
+            let id: i64 = id.parse().map_err(|_| ApiErr::bad("Geçersiz kimlik"))?;
+            st.sessions.lock().unwrap().retain(|_, (uid, _)| *uid != id);
+            aud(db, &me, "Kullanıcının tüm oturumları kapatıldı", &format!("kullanıcı #{id}"));
+            done()
+        }
+        ("GET", ["api", "reports", "monthly"]) => {
+            need_lead(&me)?;
+            let ym = q.get("ym").cloned().unwrap_or_else(|| chrono::Local::now().format("%Y-%m").to_string());
+            ok_json(&db.monthly_report(&ym)?)
+        }
+        ("GET", ["api", "me", "totp"]) => {
+            let left = db.kv_get(&format!("totp_rc_{}", me.id)).unwrap_or_default().split(',').filter(|x| !x.is_empty()).count();
+            Ok(Resp::Json(json!({"enabled": db.kv_get(&format!("totp_on_{}", me.id)).as_deref() == Some("1"), "recovery_left": left})))
+        }
+        ("POST", ["api", "me", "totp", "recovery"]) => {
+            let v: Value = parse(&body)?;
+            let sec = db.kv_get(&format!("totp_{}", me.id)).unwrap_or_default();
+            if sec.is_empty() || !db.check_password(me.id, v["password"].as_str().unwrap_or(""))? || !crate::totp::verify(&sec, v["code"].as_str().unwrap_or("")) {
+                return Err(ApiErr::bad("Şifre veya doğrulama kodu hatalı."));
+            }
+            let codes = make_recovery(db, me.id)?;
+            db.audit(me.id, &me.full_name(), "2FA kurtarma kodları yenilendi", "");
+            Ok(Resp::Json(json!({"codes": codes})))
+        }
+        ("POST", ["api", "me", "totp", "setup"]) => {
+            let sec = crate::totp::new_secret();
+            db.kv_set(&format!("totp_pending_{}", me.id), &sec)?;
+            Ok(Resp::Json(json!({"secret": sec, "uri": crate::totp::uri(&sec, &me.username, "Emlak Ofis")})))
+        }
+        ("POST", ["api", "me", "totp", "enable"]) => {
+            let v: Value = parse(&body)?;
+            let sec = db.kv_get(&format!("totp_pending_{}", me.id)).unwrap_or_default();
+            if sec.is_empty() || !crate::totp::verify(&sec, v["code"].as_str().unwrap_or("")) {
+                return Err(ApiErr::bad("Kod hatalı. Uygulamadaki güncel 6 haneli kodu girin."));
+            }
+            db.kv_set(&format!("totp_{}", me.id), &sec)?;
+            db.kv_set(&format!("totp_on_{}", me.id), "1")?;
+            db.kv_set(&format!("totp_pending_{}", me.id), "")?;
+            db.audit(me.id, &me.full_name(), "İki aşamalı doğrulama açıldı", "");
+            let codes = make_recovery(db, me.id)?;
+            Ok(Resp::Json(json!({"ok": true, "codes": codes})))
+        }
+        ("POST", ["api", "me", "totp", "disable"]) => {
+            let v: Value = parse(&body)?;
+            let sec = db.kv_get(&format!("totp_{}", me.id)).unwrap_or_default();
+            if !db.check_password(me.id, v["password"].as_str().unwrap_or(""))? || !crate::totp::verify(&sec, v["code"].as_str().unwrap_or("")) {
+                return Err(ApiErr::bad("Şifre veya doğrulama kodu hatalı."));
+            }
+            db.kv_set(&format!("totp_on_{}", me.id), "0")?;
+            db.kv_set(&format!("totp_{}", me.id), "")?;
+            db.kv_set(&format!("totp_rc_{}", me.id), "")?;
+            db.audit(me.id, &me.full_name(), "İki aşamalı doğrulama kapatıldı", "");
+            done()
+        }
+        ("DELETE", ["api", "users", id, "totp"]) => {
+            need_admin(&me)?;
+            let id: i64 = id.parse().map_err(|_| ApiErr::bad("Geçersiz kimlik"))?;
+            db.kv_set(&format!("totp_on_{id}"), "0")?;
+            db.kv_set(&format!("totp_{id}"), "")?;
+            db.audit(me.id, &me.full_name(), "İki aşamalı doğrulama sıfırlandı", &format!("kullanıcı #{id}"));
+            done()
+        }
         ("PUT", ["api", "me", "photo"]) => {
             let (full, _) = process_image(&body, 480, 120)?;
             db.set_user_photo(me.id, Some(full))?;
@@ -342,7 +552,15 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
                 None => Err(ApiErr::not_found()),
             }
         }
-        ("GET", ["api", "users"]) => ok_json(&db.list_users()?),
+        ("GET", ["api", "users"]) => {
+            let mut v = db.list_users()?;
+            if me.is_admin() {
+                for u in v.iter_mut() {
+                    u.totp = db.kv_get(&format!("totp_on_{}", u.id)).as_deref() == Some("1");
+                }
+            }
+            ok_json(&v)
+        }
         ("POST", ["api", "users"]) => {
             need_admin(&me)?;
             let v: Value = parse(&body)?;
@@ -408,6 +626,7 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
         ("POST", ["api", "portfolios"]) => {
             let p: Portfolio = parse(&body)?;
             let id = db.create_portfolio(&me, &p)?;
+            crate::web::set_tags(db, id, &p.tags);
             crate::server_ext::after_portfolio_save(db, &me, id, None);
             Ok(Resp::Json(json!({"id": id})))
         }
@@ -423,7 +642,9 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
             let p: Portfolio = parse(&body)?;
             let before = crate::server_ext::snapshot(db, id);
             db.update_portfolio(&me, id, &p)?;
+            crate::web::set_tags(db, id, &p.tags);
             crate::server_ext::after_portfolio_save(db, &me, id, before);
+            crate::web::push_bg(db, id);
             done()
         }
         ("DELETE", ["api", "portfolios", id]) => {
@@ -431,6 +652,7 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
             let pid: i64 = id.parse().unwrap_or(0);
             let title: String = db.conn.query_row("SELECT title FROM portfolios WHERE id=?1", rusqlite::params![pid], |r| r.get(0)).unwrap_or_default();
             db.delete_portfolio(pid)?;
+            crate::web::delete_bg(db, pid);
             aud(db, &me, "Portföy silindi", &format!("P-{:05} {}", pid, title));
             done()
         }
@@ -443,6 +665,7 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
             let (full, thumb) = process_image(&body, 1600, 320)?;
             let db_guard = st.db.lock().map_err(|_| ApiErr(500, "Veritabanı kilitlendi".into()))?;
             let pid = db_guard.add_photo(id, &full, &thumb)?;
+            crate::web::push_bg(&db_guard, id);
             Ok(Resp::Json(json!({"id": pid})))
         }
         ("GET", ["api", "photos", id]) => {
@@ -457,6 +680,7 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
                 return Err(ApiErr::forbidden());
             }
             db.delete_photo(id)?;
+            crate::web::push_bg(db, pid);
             done()
         }
         ("PUT", ["api", "photos", id, "cover"]) => {
@@ -466,6 +690,7 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
                 return Err(ApiErr::forbidden());
             }
             db.set_cover(id)?;
+            crate::web::push_bg(db, pid);
             done()
         }
 
@@ -479,6 +704,26 @@ fn route(st: &State, method: &str, path: &str, q: &HashMap<String, String>, toke
             let c: CrmContact = parse(&body)?;
             db.update_contact(id.parse().unwrap_or(0), &c.full_name, &c.phone, &c.email, &c.note)?;
             done()
+        }
+        ("PUT", ["api", "crm", id, "photo"]) => {
+            need_admin(&me)?;
+            drop(db_guard); // resim işlerken veritabanını kilitli tutma
+            let (full, _) = process_image(&body, 480, 120)?;
+            let db_guard = st.db.lock().map_err(|_| ApiErr(500, "Veritabanı kilitlendi".into()))?;
+            db_guard.set_contact_photo(id.parse().unwrap_or(0), Some(full))?;
+            done()
+        }
+        ("DELETE", ["api", "crm", id, "photo"]) => {
+            need_admin(&me)?;
+            db.set_contact_photo(id.parse().unwrap_or(0), None)?;
+            done()
+        }
+        ("GET", ["api", "crm", id, "photo"]) => {
+            need_admin(&me)?;
+            match db.contact_photo(id.parse().unwrap_or(0))? {
+                Some(b) => Ok(Resp::Bytes(b, "image/jpeg")),
+                None => Err(ApiErr::not_found()),
+            }
         }
         ("DELETE", ["api", "crm", id]) => {
             need_admin(&me)?;

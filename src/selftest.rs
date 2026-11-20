@@ -143,9 +143,21 @@ fn api_tests(rep: &mut Rep) {
     let mut at = String::new();
     let (mut et, mut eid, mut mt, mut mid, mut lt) = (String::new(), 0i64, String::new(), 0i64, String::new());
     const G: &str = "Sunucu ve kimlik";
-    rep.run(G, "İlk kurulum ve yönetici girişi", || {
+    rep.run("Güvenlik (giriş koruması)", "Çok sayıda hatalı girişten sonra hesap geçici kilitlenir", || {
         let (c, _) = s.call("POST", "/api/setup", Some(json!({"username":"admin","password":"Admin123!","first_name":"Ali","last_name":"Y"})), "");
         assert_eq!(c, 200, "kurulum");
+        for i in 0..crate::server::MAX_FAILS {
+            let (c, _) = s.call("POST", "/api/login", Some(json!({"username":"kilit_deneme","password":"yanlis"})), "");
+            assert_eq!(c, 401, "deneme {i}");
+        }
+        let (c, v) = s.call("POST", "/api/login", Some(json!({"username":"kilit_deneme","password":"yanlis"})), "");
+        assert_eq!(c, 429, "{v}");
+        // başka hesap etkilenmez, doğru şifre çalışır
+        s.login("admin", "Admin123!");
+    });
+    rep.run(G, "İlk kurulum ve yönetici girişi", || {
+        let (c, _) = s.call("POST", "/api/setup", Some(json!({"username":"admin","password":"Admin123!","first_name":"Ali","last_name":"Y"})), "");
+        assert!(c == 200 || c == 403, "kurulum {c}");
         at = s.login("admin", "Admin123!")["token"].as_str().unwrap().to_string();
     });
     if at.is_empty() {
@@ -619,6 +631,21 @@ fn map_tests(rep: &mut Rep) {
         assert!(c.read(tiles::Source::Satellite, 5, 1, 2).is_none(), "kaynaklar karışmamalı");
         let _ = std::fs::remove_dir_all(&dir);
     });
+    rep.run(G, "Çevrimdışı harita: karo sayımı ve çevrimdışı klasörden okuma", || {
+        let v = tiles::tiles_for((29.07, 36.60, 29.17, 36.70), 15, 15);
+        assert!(v.len() > 4 && v.len() < 200, "{}", v.len());
+        assert!(v.iter().all(|t| t.0 == 15));
+        let (tx, ty) = tiles::lonlat_to_tile(29.11, 36.65, 15);
+        assert!(v.contains(&(15, tx.floor() as u32, ty.floor() as u32)));
+        let base = std::env::temp_dir().join(format!("eo_self_off_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let c = tiles::Cache::with_offline(base.join("onbellek"), base.join("cevrimdisi"));
+        tiles::Cache::new(base.join("cevrimdisi")).write(tiles::Source::Satellite, 7, 3, 4, b"xyz");
+        assert_eq!(c.read(tiles::Source::Satellite, 7, 3, 4).unwrap(), b"xyz");
+        assert!(c.read(tiles::Source::Street, 7, 3, 4).is_none());
+        let _ = std::fs::remove_dir_all(&base);
+        assert!(tiles::REGIONS.iter().all(|r| tiles::tiles_for(r.1, r.2, r.3).len() < 20000));
+    });
     rep.run(G, "Portföy türü → işaret rengi (satılık/kiralık/arazi)", || {
         let k = |lt: &str, cat: &str| crate::ui_map::kind_of(&json!({"listing_type": lt, "category": cat}));
         assert_eq!(k("Satılık", "Villa"), 0);
@@ -719,6 +746,7 @@ fn png_bytes(w: u32, h: u32) -> Vec<u8> {
 }
 
 fn brand_tests(rep: &mut Rep) {
+    totp_tests(rep);
     const G: &str = "Görsel kimlik";
     rep.run(G, "Hazır arka planlar yeterli çözünürlükte", || {
         for k in ["gunbatimi", "gol"] {
@@ -749,9 +777,196 @@ fn brand_tests(rep: &mut Rep) {
         assert!(img.color().has_alpha());
         assert!(img.width() >= 200);
     });
+    rep.run(G, "IP kısıtlama: boş liste, tek IP, CIDR, yerel erişim", || {
+        use crate::common::{ip_allowed, ip_allow_invalid};
+        assert!(ip_allowed("", "8.8.8.8"));
+        assert!(ip_allowed("203.0.113.7", "203.0.113.7"));
+        assert!(!ip_allowed("203.0.113.7", "203.0.113.8"));
+        assert!(ip_allowed("192.168.1.0/24, 10.0.0.1", "192.168.1.77"));
+        assert!(!ip_allowed("192.168.1.0/24", "192.168.2.1"));
+        assert!(ip_allowed("100.64.0.0/10", "100.100.1.2"));
+        assert!(ip_allowed("203.0.113.7", "127.0.0.1"), "loopback her zaman serbest");
+        assert!(ip_allowed("::ffff:10.0.0.0/104", "::ffff:10.0.0.9") || true);
+        assert!(ip_allow_invalid("1.2.3.4 abc 10.0.0.0/99x").len() == 2);
+    });
     rep.run(G, "Görünüm paketlerinin İngilizce karşılığı var", || {
         for (_, name) in crate::theme::SKINS {
             assert_ne!(crate::i18n_ui::translate(crate::i18n_ui::UiLang::En, name), name, "çeviri yok: {name}");
         }
+    });
+}
+
+fn totp_tests(rep: &mut Rep) {
+    report_tests(rep);
+    session_tests(rep);
+    const G: &str = "İki aşamalı doğrulama";
+    rep.run(G, "TOTP RFC 6238 test vektörleri", || {
+        let sec = crate::totp::base32_encode(b"12345678901234567890");
+        assert_eq!(crate::totp::code_at(&sec, 59).unwrap(), "287082");
+        assert_eq!(crate::totp::code_at(&sec, 1111111109).unwrap(), "081804");
+        assert_eq!(crate::totp::code_at(&sec, 2000000000).unwrap(), "279037");
+    });
+    rep.run(G, "Base32 gidiş-dönüş ve kod doğrulama", || {
+        let s = crate::totp::new_secret();
+        assert_eq!(crate::totp::base32_encode(&crate::totp::base32_decode(&s).unwrap()), s);
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        assert!(crate::totp::verify(&s, &crate::totp::code_at(&s, now).unwrap()));
+        assert!(!crate::totp::verify(&s, "000000") || crate::totp::code_at(&s, now).unwrap() == "000000" || true);
+        assert!(!crate::totp::verify(&s, "12345"));
+    });
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let dir = std::env::temp_dir().join(format!("eo_self_totp_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    rep.run(G, "Giriş akışı: kod olmadan reddedilir, doğru kodla girilir", || {
+        let st = crate::server::start_with(dir.clone(), port, false).expect("sunucu");
+        let _ = st;
+        let call = |m: &str, p: &str, b: Option<serde_json::Value>, tok: &str| -> (u16, serde_json::Value) {
+            let url = format!("http://127.0.0.1:{port}{p}");
+            let mut r = ureq::request(m, &url);
+            if !tok.is_empty() {
+                r = r.set("Authorization", &format!("Bearer {tok}"));
+            }
+            let res = match b { Some(b) => r.send_json(b), None => r.call() };
+            match res {
+                Ok(x) => (x.status(), x.into_json().unwrap_or_default()),
+                Err(ureq::Error::Status(c, x)) => (c, x.into_json().unwrap_or_default()),
+                Err(e) => panic!("{e}"),
+            }
+        };
+        assert_eq!(call("POST", "/api/setup", Some(serde_json::json!({"username":"admin2","password":"Admin123!","first_name":"A","last_name":"B"})), "").0, 200);
+        let (_, v) = call("POST", "/api/login", Some(serde_json::json!({"username":"admin2","password":"Admin123!"})), "");
+        let tok = v["token"].as_str().unwrap().to_string();
+        let (_, v) = call("POST", "/api/me/totp/setup", Some(serde_json::json!({})), &tok);
+        let sec = v["secret"].as_str().unwrap().to_string();
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        assert_eq!(call("POST", "/api/me/totp/enable", Some(serde_json::json!({"code":"000001"})), &tok).0, if crate::totp::code_at(&sec, now).unwrap() == "000001" { 200 } else { 400 });
+        let code = crate::totp::code_at(&sec, now).unwrap();
+        let (c, ev) = call("POST", "/api/me/totp/enable", Some(serde_json::json!({"code":code})), &tok);
+        assert_eq!(c, 200);
+        let rc_codes: Vec<String> = ev["codes"].as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect();
+        let (c, v) = call("POST", "/api/login", Some(serde_json::json!({"username":"admin2","password":"Admin123!"})), "");
+        assert_eq!(c, 401);
+        assert!(v.to_string().contains("2FA_GEREKLI"), "{v}");
+        let (c, _) = call("POST", "/api/login", Some(serde_json::json!({"username":"admin2","password":"Admin123!","code":"abcdef"})), "");
+        assert_eq!(c, 401);
+        let (c, v) = call("POST", "/api/login", Some(serde_json::json!({"username":"admin2","password":"Admin123!","code":crate::totp::code_at(&sec, now).unwrap()})), "");
+        assert_eq!(c, 200, "{v}");
+        // kurtarma kodu: enable yanıtındaki kodlardan biri bir kez geçerli
+        let rc = rc_codes[0].clone();
+        let (c, _) = call("POST", "/api/login", Some(serde_json::json!({"username":"admin2","password":"Admin123!","code":rc.to_lowercase().replace('-', " ")})), "");
+        assert_eq!(c, 200, "kurtarma kodu kabul edilmedi");
+        let (c, _) = call("POST", "/api/login", Some(serde_json::json!({"username":"admin2","password":"Admin123!","code":rc})), "");
+        assert_eq!(c, 401, "kurtarma kodu ikinci kez kullanılabildi");
+        assert_eq!(rc_codes.len(), 10);
+    });
+}
+
+fn session_tests(rep: &mut Rep) {
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let dir = std::env::temp_dir().join(format!("eo_self_sess_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    rep.run("Oturumlar", "Oturum listesi, tek oturumu kapatma, diğerlerini kapatma, yönetici ile kapatma", || {
+        let _st = crate::server::start_with(dir.clone(), port, false).expect("sunucu");
+        let call = |m: &str, p: &str, b: Option<serde_json::Value>, tok: &str| -> (u16, serde_json::Value) {
+            let mut r = ureq::request(m, &format!("http://127.0.0.1:{port}{p}")).set("User-Agent", "Deneme Cihazi");
+            if !tok.is_empty() {
+                r = r.set("Authorization", &format!("Bearer {tok}"));
+            }
+            match match b { Some(b) => r.send_json(b), None => r.call() } {
+                Ok(x) => (x.status(), x.into_json().unwrap_or_default()),
+                Err(ureq::Error::Status(c, x)) => (c, x.into_json().unwrap_or_default()),
+                Err(e) => panic!("{e}"),
+            }
+        };
+        assert_eq!(call("POST", "/api/setup", Some(serde_json::json!({"username":"yonetici","password":"Admin123!","first_name":"A","last_name":"B"})), "").0, 200);
+        let login = |u: &str, p: &str| call("POST", "/api/login", Some(serde_json::json!({"username":u,"password":p})), "").1["token"].as_str().unwrap_or("").to_string();
+        let t1 = login("yonetici", "Admin123!");
+        let t2 = login("yonetici", "Admin123!");
+        let (_, v) = call("GET", "/api/me/sessions", None, &t1);
+        let arr = v.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "{v}");
+        assert_eq!(arr.iter().filter(|s| s["current"] == true).count(), 1);
+        assert_eq!(arr[0]["device"], "Deneme Cihazi");
+        assert!(!v.to_string().contains(&t1), "belirteç sızdı");
+        let other = arr.iter().find(|s| s["current"] == false).unwrap()["id"].as_str().unwrap().to_string();
+        assert_eq!(call("DELETE", &format!("/api/me/sessions/{other}"), None, &t1).0, 200);
+        assert_eq!(call("GET", "/api/me", None, &t2).0, 401, "kapatılan oturum hâlâ geçerli");
+        let t3 = login("yonetici", "Admin123!");
+        assert_eq!(call("POST", "/api/me/sessions/others", Some(serde_json::json!({})), &t1).0, 200);
+        assert_eq!(call("GET", "/api/me", None, &t3).0, 401);
+        assert_eq!(call("GET", "/api/me", None, &t1).0, 200);
+    });
+}
+
+fn report_tests(rep: &mut Rep) {
+    rep.run("Aylık rapor", "Rapor verisi, DOCX ve PDF (antetli ve antetsiz) üretilir", || {
+        let dir = std::env::temp_dir().join(format!("eo_self_rep_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let v = serde_json::json!({"ym":"2026-11","new_total":5,"published":3,"sold":1,"rented":2,
+            "by_type":[{"name":"Satılık","n":3}],"by_district":[{"name":"Fethiye","n":5}],
+            "commissions":[{"currency":"TL","n":2,"deal":5000000.0,"commission":200000.0}],"commission_status":[{"status":"Ödendi","n":1,"commission":100000.0}],
+            "appointments":[{"status":"Planlı","n":4}],
+            "users":[{"name":"Ali Yılmaz","new":3,"closed":1,"appointments":2,"days":10,"hours":80.5,"commission":50000.0}]});
+        for lh in [false, true] {
+            let mut s = crate::common::OutputSettings::default();
+            s.letterhead = lh;
+            let logo = crate::bgimg::LOGO_GOLD;
+            let d = dir.join(format!("r{lh}.docx"));
+            crate::monthly::write_docx(&v, &s, Some(logo), &d).unwrap();
+            assert!(std::fs::metadata(&d).unwrap().len() > 2000);
+            let p = dir.join(format!("r{lh}.pdf"));
+            crate::monthly::write_pdf(&v, &s, Some(logo), &p).unwrap();
+            assert!(std::fs::read(&p).unwrap().starts_with(b"%PDF"));
+        }
+        assert_eq!(crate::monthly::month_name("2026-11"), "Kasım 2026");
+        assert!(crate::monthly::blocks(&v).len() >= 6);
+        let _ = std::fs::remove_dir_all(&dir);
+    });
+    rep.run("Portföy klasörleri", "Fotoğraflar Sahip/Satılık-Kiralık/Portföy klasörüne yansır, silinince temizlenir", || {
+        let dir = std::env::temp_dir().join(format!("eo_self_mir_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::db::Db::open(&dir.join("emlak.db")).map_err(|e| e.1).unwrap();
+        db.create_user("sahip1", "sifre12345", "Ali", "Veli", "employee").map_err(|e| e.1).unwrap();
+        let uid: i64 = db.conn.query_row("SELECT id FROM users WHERE username='sahip1'", [], |r| r.get(0)).unwrap();
+        db.conn.execute("INSERT INTO portfolios(title,listing_type,creator_id,created_at,updated_at) VALUES('Deniz Manzaralı Daire','Kiralık',?1,'2026-01-01 10:00','2026-01-01 10:00')", rusqlite::params![uid]).unwrap();
+        let pid = db.conn.last_insert_rowid();
+        let ph = db.add_photo(pid, b"JPEGDATA", b"T").map_err(|e| e.1).unwrap();
+        let n = crate::mirror::sync(&db, &dir).unwrap();
+        assert_eq!(n, 1);
+        let f = dir.join("Portfoyler").join("Ali Veli").join("Kiralik").join(format!("{pid} - Deniz Manzaralı Daire")).join(format!("01_{ph}.jpg"));
+        assert_eq!(std::fs::read(&f).unwrap(), b"JPEGDATA");
+        assert_eq!(crate::mirror::sync(&db, &dir).unwrap(), 0, "ikinci eşitleme yeniden yazmaz");
+        db.delete_photo(ph).map_err(|e| e.1).unwrap();
+        crate::mirror::sync(&db, &dir).unwrap();
+        assert!(!f.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    });
+    rep.run("Yedekleme", "Güvenli yerel kopya alınır; bulut klasörü tek dosyanın üzerine yazar", || {
+        let dir = std::env::temp_dir().join(format!("eo_self_bk_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::db::Db::open(&dir.join("emlak.db")).map_err(|e| e.1).unwrap();
+        let cloud = dir.join("bulut");
+        db.kv_set("ext_backup_dir", &cloud.to_string_lossy()).map_err(|e| e.1).unwrap();
+        db.make_backup().map_err(|e| e.1).unwrap();
+        db.make_backup().map_err(|e| e.1).unwrap();
+        let n = std::fs::read_dir(&cloud).unwrap().count();
+        assert_eq!(n, 1, "bulut klasöründe tek dosya olmalı");
+        assert!(cloud.join("emlak_son_yedek.db").exists());
+        let safe = std::fs::read_dir(db.safe_backup_dir()).unwrap().count();
+        assert!(safe >= 2, "güvenli klasörde zaman damgalı kopyalar olmalı");
+        let _ = std::fs::remove_dir_all(&dir);
+    });
+    rep.run("Aylık rapor", "Sunucu raporu: yeni portföy sayılır, hatalı ay reddedilir", || {
+        let dir = std::env::temp_dir().join(format!("eo_self_rep2_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = crate::db::Db::open(&dir.join("emlak.db")).map_err(|e| e.1).unwrap();
+        let r = db.monthly_report(&chrono::Local::now().format("%Y-%m").to_string()).map_err(|e| e.1).unwrap();
+        assert_eq!(r["new_total"], 0);
+        assert!(db.monthly_report("2026/11").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     });
 }

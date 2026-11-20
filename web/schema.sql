@@ -1,0 +1,42 @@
+-- Cloudflare D1 (SQLite) şeması — sahibindenfethiye.com.tr
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL DEFAULT '', pw_hash TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'local', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT '', last_login TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, admin_id INTEGER NOT NULL, expires_at INTEGER NOT NULL, ip TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS listings(
+  id INTEGER PRIMARY KEY,               -- programdaki portföy numarası
+  slug TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL, title_en TEXT NOT NULL DEFAULT '', title_ru TEXT NOT NULL DEFAULT '',
+  listing_type TEXT NOT NULL DEFAULT '', category TEXT NOT NULL DEFAULT '',   -- Satılık/Kiralık ; Villa/Daire/Arazi/...
+  district TEXT NOT NULL DEFAULT '', neighborhood TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '',
+  lat REAL NOT NULL DEFAULT 0, lon REAL NOT NULL DEFAULT 0, hide_exact_location INTEGER NOT NULL DEFAULT 1,
+  price REAL NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'TRY', price_note TEXT NOT NULL DEFAULT '',
+  gross_m2 REAL NOT NULL DEFAULT 0, net_m2 REAL NOT NULL DEFAULT 0, rooms TEXT NOT NULL DEFAULT '', bathrooms TEXT NOT NULL DEFAULT '',
+  building_age TEXT NOT NULL DEFAULT '', floor TEXT NOT NULL DEFAULT '', total_floors TEXT NOT NULL DEFAULT '',
+  heating TEXT NOT NULL DEFAULT '', deed_status TEXT NOT NULL DEFAULT '', furnished INTEGER NOT NULL DEFAULT 0, swap_ok INTEGER NOT NULL DEFAULT 0, credit_ok INTEGER NOT NULL DEFAULT 0,
+  desc_tr TEXT NOT NULL DEFAULT '', desc_en TEXT NOT NULL DEFAULT '', desc_ru TEXT NOT NULL DEFAULT '',
+  tags TEXT NOT NULL DEFAULT '[]',      -- JSON dizi: etiket adları
+  photo_count INTEGER NOT NULL DEFAULT 0, photo_order TEXT NOT NULL DEFAULT '[]', -- R2: l/<id>/<n>.jpg
+  agent_name TEXT NOT NULL DEFAULT '', agent_phone TEXT NOT NULL DEFAULT '',
+  prog_status TEXT NOT NULL DEFAULT 'Yayında',  -- Yayında / Kiralandı / Satıldı (programdan)
+  visible INTEGER NOT NULL DEFAULT 1,    -- admin panelinden gizle/göster
+  featured INTEGER NOT NULL DEFAULT 0, sort_key INTEGER NOT NULL DEFAULT 0, views INTEGER NOT NULL DEFAULT 0,
+  published_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '',
+  overrides TEXT NOT NULL DEFAULT '{}'   -- admin panelinde elle değiştirilen alanlar (senkron bunların üzerine yazmaz)
+);
+CREATE INDEX IF NOT EXISTS idx_l_cat ON listings(listing_type, category, visible);
+CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, name_en TEXT NOT NULL DEFAULT '', name_ru TEXT NOT NULL DEFAULT '', color TEXT NOT NULL DEFAULT '#d4af37', sort_key INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS menu_items(id INTEGER PRIMARY KEY AUTOINCREMENT, menu TEXT NOT NULL DEFAULT 'main', parent_id INTEGER NOT NULL DEFAULT 0, label TEXT NOT NULL, label_en TEXT NOT NULL DEFAULT '', label_ru TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'link',   -- listings (filtre) | page | blogcat | link | home | blog
+  target TEXT NOT NULL DEFAULT '',     -- listings: "Satılık|Villa" ; page/blogcat: slug ; link: url
+  slug TEXT NOT NULL DEFAULT '', sort_key INTEGER NOT NULL DEFAULT 0, visible INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS blog_categories(id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, name_en TEXT NOT NULL DEFAULT '', name_ru TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT 'blog', sort_key INTEGER NOT NULL DEFAULT 0);  -- kind: blog | news
+CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, category_id INTEGER NOT NULL DEFAULT 0, title TEXT NOT NULL, title_en TEXT NOT NULL DEFAULT '', title_ru TEXT NOT NULL DEFAULT '',
+  excerpt TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', body_en TEXT NOT NULL DEFAULT '', body_ru TEXT NOT NULL DEFAULT '',   -- güvenli HTML (sanitize edilir)
+  image TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'yayinda', -- taslak | yayinda
+  author TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'admin',   -- admin | program | import
+  views INTEGER NOT NULL DEFAULT 0, published_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS pages(id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, title TEXT NOT NULL, title_en TEXT NOT NULL DEFAULT '', title_ru TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', body_en TEXT NOT NULL DEFAULT '', body_ru TEXT NOT NULL DEFAULT '', visible INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS banners(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL DEFAULT '', subtitle TEXT NOT NULL DEFAULT '', image TEXT NOT NULL DEFAULT '', link TEXT NOT NULL DEFAULT '', button TEXT NOT NULL DEFAULT '', sort_key INTEGER NOT NULL DEFAULT 0, visible INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', listing_id INTEGER NOT NULL DEFAULT 0, ip TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT '', is_read INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS activity(id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, who TEXT NOT NULL DEFAULT '', what TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS test_runs(id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, passed INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, report TEXT NOT NULL DEFAULT '');

@@ -41,6 +41,22 @@ impl App {
         }
     }
 
+    /// CRM kişisinin yuvarlak resmi (yoksa baş harfler).
+    pub fn crm_avatar(&mut self, ui: &mut Ui, id: i64, has_photo: bool, name: &str, size: f32) {
+        let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
+        let painter = ui.painter_at(rect);
+        match if has_photo { self.tex(TexKey::Crm(id)) } else { None } {
+            Some(t) => {
+                ui.put(rect, egui::Image::from_texture((t.id(), vec2(size, size))).corner_radius(size / 2.0));
+            }
+            None => {
+                painter.circle_filled(rect.center(), size / 2.0, thumb_bg());
+                let ini: String = name.split_whitespace().filter_map(|w| w.chars().next()).take(2).collect::<String>().to_uppercase();
+                painter.text(rect.center(), Align2::CENTER_CENTER, ini, FontId::proportional(size * 0.4), muted());
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ profil
     pub fn ui_profile(&mut self, ui: &mut Ui) {
         page_title(ui, "Profilim");
@@ -125,6 +141,10 @@ impl App {
                     );
                 }
             });
+            ui.add_space(10.0);
+            self.totp_card(ui);
+            ui.add_space(10.0);
+            self.sessions_card(ui);
             ui.add_space(10.0);
             card_frame(ui.style()).inner_margin(14.0).show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -212,6 +232,7 @@ impl App {
                 card_frame(ui.style()).inner_margin(10.0).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
+                        self.crm_avatar(ui, c.id, c.has_photo, &c.full_name, 34.0);
                         ui.label(RichText::new(if c.full_name.is_empty() { "(isimsiz)" } else { &c.full_name }).size(16.0).strong());
                         if !c.phone.is_empty() {
                             ui.label(format!("Tel: {}", c.phone));
@@ -306,7 +327,21 @@ impl App {
         let Some(mut c) = self.crm_edit.take() else { return };
         let mut keep = true;
         let mut save = false;
+        let mut photo_act = 0; // 1 seç, 2 kaldır
         egui::Window::new("Mülk sahibi kaydını düzenle").collapsible(false).resizable(false).anchor(Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                self.crm_avatar(ui, c.id, c.has_photo, &c.full_name, 84.0);
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(ti("Resim (profil veya hatırlatıcı)")).small().color(muted()));
+                    if ui.button(ti("Resim seç…")).clicked() {
+                        photo_act = 1;
+                    }
+                    if c.has_photo && ui.button(ti("Resmi kaldır")).clicked() {
+                        photo_act = 2;
+                    }
+                });
+            });
+            ui.add_space(6.0);
             egui::Grid::new("crm_edit").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
                 ui.label(ti("Ad Soyad"));
                 ui.add(egui::TextEdit::singleline(&mut c.full_name).desired_width(280.0));
@@ -331,6 +366,34 @@ impl App {
                 }
             });
         });
+        if photo_act == 1 {
+            self.pick_files("CRM resmi", &["jpg", "jpeg", "png", "webp"], false, |app, files| {
+                if let (Some(f), Some(cc)) = (files.into_iter().next(), app.crm_edit.as_ref()) {
+                    let id = cc.id;
+                    app.call(
+                        move |api| {
+                            let b = std::fs::read(&f).map_err(|e| e.to_string())?;
+                            api.send_bytes("PUT", &format!("/api/crm/{id}/photo"), &b)
+                        },
+                        move |app, _| {
+                            app.tex.remove(&TexKey::Crm(id));
+                            if let Some(e) = app.crm_edit.as_mut() {
+                                e.has_photo = true;
+                            }
+                            app.load_crm();
+                            app.toast(ti("Resim kaydedildi."));
+                        },
+                    );
+                }
+            });
+        } else if photo_act == 2 {
+            let id = c.id;
+            c.has_photo = false;
+            self.call(move |api| api.delete(&format!("/api/crm/{id}/photo")), move |app, _| {
+                app.tex.remove(&TexKey::Crm(id));
+                app.load_crm();
+            });
+        }
         if save {
             let id = c.id;
             self.call(move |api| api.put(&format!("/api/crm/{id}"), &c), |app, _| {
@@ -381,7 +444,7 @@ impl App {
                     ui.label(RichText::new(&u.username).color(c));
                     ui.label(RichText::new(u.full_name()).color(c));
                     ui.label(RichText::new(format!("{} {}", u.phone, u.email)).color(c));
-                    ui.label(RichText::new(format!("{}{}", if u.is_admin() { "Yönetici" } else { "Çalışan" }, if u.active { "" } else { " (pasif)" })).color(c));
+                    ui.label(RichText::new(format!("{}{}{}", if u.is_admin() { "Yönetici" } else { "Çalışan" }, if u.active { "" } else { " (pasif)" }, if u.totp { " • 2FA" } else { "" })).color(c));
                     ui.horizontal(|ui| {
                         if ui.small_button(ti("Düzenle")).clicked() {
                             edit = Some(u.clone());
@@ -389,10 +452,38 @@ impl App {
                         if ui.small_button(ti("Şifre sıfırla")).clicked() {
                             reset = Some((u.id, String::new()));
                         }
+                        if u.id != self.me.id && ui.small_button(ti("Oturumlarını kapat")).on_hover_text(ti("Bu kullanıcının açık olan tüm oturumlarını sonlandırır; yeniden giriş yapması gerekir.")).clicked() {
+                            let id = u.id;
+                            self.call(move |api| api.delete(&format!("/api/users/{id}/sessions")), |app, _| app.toast(ti("Kullanıcının oturumları kapatıldı.")));
+                        }
+                        if u.totp && ui.small_button(ti("2FA sıfırla")).on_hover_text(ti("Telefonunu kaybeden kullanıcının iki aşamalı doğrulamasını kapatır; kullanıcı yalnızca şifreyle girer ve isterse yeniden kurar.")).clicked() {
+                            self.totp_reset = Some((u.id, u.full_name()));
+                        }
                     });
                     ui.end_row();
                 }
             });
+            if let Some((id, name)) = self.totp_reset.clone() {
+                let mut close = false;
+                egui::Window::new(ti("İki aşamalı doğrulamayı sıfırla")).collapsible(false).resizable(false).show(ui.ctx(), |ui| {
+                    ui.label(format!("{name}: {}", ti("iki aşamalı doğrulama kapatılacak. Önce kullanıcının kimliğinden emin olun (ör. telefonla arayın).")));
+                    ui.horizontal(|ui| {
+                        if ui.button(ti("Evet, sıfırla")).clicked() {
+                            self.call(move |api| api.delete(&format!("/api/users/{id}/totp")), |app, _| {
+                                app.toast(ti("İki aşamalı doğrulama sıfırlandı."));
+                                app.load_users();
+                            });
+                            close = true;
+                        }
+                        if ui.button(ti("Vazgeç")).clicked() {
+                            close = true;
+                        }
+                    });
+                });
+                if close {
+                    self.totp_reset = None;
+                }
+            }
             if let Some(u) = edit {
                 self.edit_user = Some(u);
             }
@@ -589,6 +680,7 @@ impl App {
                 ui.label(RichText::new(ti("Belgede gösterilecekler")).strong());
                 ui.horizontal_wrapped(|ui| {
                     ui.checkbox(&mut s.show_logo, ti("Logo"));
+                    ui.checkbox(&mut s.letterhead, ti("Antetli kağıt (üst bilgiyi basma)")).on_hover_text(ti("Ofisin önceden basılı antetli kağıdına yazdıracaksanız işaretleyin: logo ve ofis adı basılmaz, üstte boşluk bırakılır."));
                     ui.checkbox(&mut s.show_office_contact, ti("Ofis iletişim bilgileri"));
                     ui.checkbox(&mut s.show_listing_no, ti("Portföy no"));
                     ui.checkbox(&mut s.show_date, ti("Tarih"));
@@ -643,6 +735,8 @@ impl App {
                         });
                     }
                 });
+                ui.add_space(8.0);
+                self.report_ui(ui);
                 ui.add_space(8.0);
                 if ui.add(egui::Button::new(RichText::new(ti("Ayarları kaydet")).strong().color(on_btn())).fill(btn())).clicked() {
                     let body = self.set_edit.clone();

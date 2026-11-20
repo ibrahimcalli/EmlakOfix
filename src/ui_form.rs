@@ -20,8 +20,10 @@ fn num_opt(s: &str, what: &str) -> Result<Option<f64>, String> {
 impl App {
     pub fn start_new_portfolio(&mut self) {
         self.form = FormState { p: Portfolio::new_blank(), is_new: true, ..Default::default() };
+        self.form_lang = 0;
         self.view = View::Form;
         self.load_locations();
+        self.web_load_tags();
     }
 
     pub fn start_edit_portfolio(&mut self, p: &Portfolio) {
@@ -43,6 +45,8 @@ impl App {
             manual_neigh: manual,
             ..Default::default()
         };
+        self.form_lang = 0;
+        self.web_load_tags();
         self.view = View::Form;
         self.load_locations();
     }
@@ -476,8 +480,33 @@ impl App {
                     ui.checkbox(&mut self.form.p.swap_ok, ti("Takasa uygun"));
                 });
                 ui.add_space(4.0);
-                ui.label(ti("Açıklama"));
-                ui.add(egui::TextEdit::multiline(&mut self.form.p.description).desired_rows(5).desired_width(f32::INFINITY).hint_text(ti("Portföyün tanıtım metni…")));
+                self.form_tags_ui(ui);
+                ui.label(ti("Açıklama (ilan metni)"));
+                ui.horizontal(|ui| {
+                    for (i, (name, filled)) in [("Türkçe", !self.form.p.description.trim().is_empty()), ("English", !self.form.p.description_en.trim().is_empty()), ("Русский", !self.form.p.description_ru.trim().is_empty())].into_iter().enumerate() {
+                        let label = if filled { format!("{name} ✓") } else { name.to_string() };
+                        if ui.selectable_label(self.form_lang == i as u8, label).clicked() {
+                            self.form_lang = i as u8;
+                        }
+                    }
+                });
+                let (txt, hint) = match self.form_lang {
+                    1 => (&mut self.form.p.description_en, "Property description in English…"),
+                    2 => (&mut self.form.p.description_ru, "Описание объекта на русском…"),
+                    _ => (&mut self.form.p.description, "Portföyün tanıtım metni…"),
+                };
+                egui::ScrollArea::vertical().id_salt("desc_scroll").max_height(self.desc_h).min_scrolled_height(self.desc_h).auto_shrink([false, false]).show(ui, |ui| {
+                    ui.add_sized([ui.available_width(), self.desc_h], egui::TextEdit::multiline(txt).hint_text(if self.form_lang == 0 { ti(hint) } else { hint }));
+                });
+                let (hr, hresp) = ui.allocate_exact_size(vec2(ui.available_width(), 10.0), Sense::drag());
+                ui.painter().rect_filled(egui::Rect::from_center_size(hr.center(), vec2(60.0, 3.0)), 2.0, if hresp.hovered() || hresp.dragged() { accent() } else { stroke() });
+                if hresp.hovered() || hresp.dragged() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
+                }
+                if hresp.dragged() {
+                    self.desc_h = (self.desc_h + hresp.drag_delta().y).clamp(120.0, 900.0);
+                }
+                ui.label(RichText::new(ti("Alt çizgiyi sürükleyerek açıklama alanını uzatabilirsiniz.")).small().color(muted()));
             });
             ui.add_space(8.0);
 

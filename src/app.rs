@@ -29,6 +29,20 @@ pub struct Config {
     pub trusted_key: String,
     /// Bilinen sunucu sertifika parmak izleri ("adres:port" -> sha256)
     pub pins: std::collections::BTreeMap<String, String>,
+    /// Harita sağ bilgi paneli gizli mi (son durum hatırlanır)
+    pub map_side_hidden: bool,
+    /// Çevrimdışı Fethiye harita paketi ilk kurulumda indirildi mi
+    pub offline_seeded: bool,
+    /// Bu bilgisayarda ana bilgisayar modu geçerli kurulum koduyla açıldı
+    pub host_ok: bool,
+    /// İstemci kipinde geçerli kodla etkinleştirildi
+    pub client_ok: bool,
+    /// Lisans bitiş tarihi (YYYY-MM-DD; boş = süresiz)
+    pub lic_until: String,
+    /// En son görülen tarih (saat geri alınmasına karşı)
+    pub last_seen: String,
+    /// Etkin kodun türü: H / K / boş
+    pub lic_kind: String,
 }
 
 pub static VERIFY_MARKER: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
@@ -43,7 +57,14 @@ pub fn default_data_dir() -> PathBuf {
 }
 impl Config {
     pub fn load() -> Config {
-        config_path().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+        let mut c: Config = config_path().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+        if c.mode == "server" {
+            c.host_ok = true; // zaten ana bilgisayar olarak çalışan kurulumlar etkilenmez
+        }
+        if c.mode == "client" {
+            c.client_ok = true;
+        }
+        c
     }
     pub fn save(&self) {
         if let Some(p) = config_path() {
@@ -87,6 +108,7 @@ pub enum View {
     Map,
     Commissions,
     Audit,
+    Blog,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -94,6 +116,7 @@ pub enum TexKey {
     Thumb(i64),
     Full(i64),
     User(i64),
+    Crm(i64),
     Logo,
     Local(String),
 }
@@ -121,6 +144,18 @@ pub struct Filters {
     pub stale: bool,
     pub list_mode: bool,
     pub group: bool,
+}
+
+#[derive(Default, Clone)]
+pub struct TotpUi {
+    pub loaded: bool,
+    pub enabled: bool,
+    pub secret: String,
+    pub uri: String,
+    pub code: String,
+    pub pw: String,
+    pub codes: Vec<String>,
+    pub left: usize,
 }
 
 #[derive(Default)]
@@ -164,7 +199,7 @@ pub struct GoalForm {
     pub user_id: i64,
     pub start: chrono::NaiveDate,
     pub end: chrono::NaiveDate,
-    pub t: [i64; 4],
+    pub t: [i64; 5],
     pub note: String,
 }
 
@@ -191,6 +226,17 @@ pub struct App {
 
     // Karşılama / giriş
     pub w_mode: u8,
+    pub w_code: String,
+    pub lic_code: String,
+    pub lic_msg: String,
+    pub form_lang: u8,
+    pub listing_lang: u8,
+    pub desc_h: f32,
+    /// Çevrimdışı oturum: parola yalnızca bellekte, yeniden bağlanınca otomatik oturum açmak için
+    pub offline_session: bool,
+    pub session_pw: String,
+    pub last_cache_save: Instant,
+    pub relogin_busy: bool,
     pub w_addr: String,
     pub w_port: String,
     pub found: Vec<String>,
@@ -209,6 +255,14 @@ pub struct App {
     pub needs_setup: bool,
     pub l_user: String,
     pub l_pass: String,
+    pub l_code: String,
+    pub ctx_menu: crate::ui_ctx::CtxMenu,
+    pub totp_reset: Option<(i64, String)>,
+    pub need_code: bool,
+    pub report_ym: String,
+    pub sessions: Vec<serde_json::Value>,
+    pub sess_loaded: bool,
+    pub totp: TotpUi,
     pub su_first: String,
     pub su_last: String,
     pub su_pass2: String,
@@ -221,6 +275,10 @@ pub struct App {
     pub view: View,
     pub rev: u64,
     pub last_poll: Instant,
+    pub last_flush: Instant,
+    pub close_ask: bool,
+    pub allow_close: bool,
+    pub flush_busy: bool,
     pub polling: bool,
     pub unread: i64,
     pub tex: HashMap<TexKey, Tex>,
@@ -263,6 +321,7 @@ pub struct App {
     pub att_edit: Option<AttInfo>,
     pub goals: Vec<GoalInfo>,
     pub gform: GoalForm,
+    pub web: crate::ui_web::WebUi,
     pub notifs: Vec<NotifInfo>,
 
     // Yönetim
@@ -340,6 +399,16 @@ impl App {
             toasts: vec![],
             busy: 0,
             offline: false,
+            w_code: String::new(),
+            lic_code: String::new(),
+            lic_msg: String::new(),
+            form_lang: 0,
+            listing_lang: 0,
+            desc_h: 240.0,
+            offline_session: false,
+            session_pw: String::new(),
+            last_cache_save: Instant::now(),
+            relogin_busy: false,
             w_mode: if cfg.mode == "client" { 1 } else { 0 },
             w_addr: cfg.server_addr.clone(),
             w_port: cfg.port_or_default().to_string(),
@@ -349,6 +418,14 @@ impl App {
             needs_setup: false,
             l_user: cfg.last_user.clone(),
             l_pass: String::new(),
+            l_code: String::new(),
+            ctx_menu: Default::default(),
+            totp_reset: None,
+            need_code: false,
+            report_ym: String::new(),
+            sessions: Vec::new(),
+            sess_loaded: false,
+            totp: TotpUi::default(),
             su_first: String::new(),
             su_last: String::new(),
             su_pass2: String::new(),
@@ -360,6 +437,10 @@ impl App {
             ext: crate::ui_ext::ExtState::new(),
             rev: 0,
             last_poll: Instant::now(),
+            last_flush: Instant::now(),
+            close_ask: false,
+            allow_close: false,
+            flush_busy: false,
             polling: false,
             unread: 0,
             tex: HashMap::new(),
@@ -377,7 +458,7 @@ impl App {
             exporting: false,
             last_export: None,
             doc_lang: crate::i18n_doc::Lang::Tr,
-            thumb_w: 250.0,
+            thumb_w: 215.0,
             bg_tex: None,
             bg_key: String::new(),
             bg_ver: 0,
@@ -403,7 +484,8 @@ impl App {
             att_user: 0,
             att_edit: None,
             goals: vec![],
-            gform: GoalForm { show: false, title: String::new(), user_id: 0, start: first_of_month(today), end: last_of_month(today), t: [5, 2, 1, 0], note: String::new() },
+            gform: GoalForm { show: false, title: String::new(), user_id: 0, start: first_of_month(today), end: last_of_month(today), t: [5, 2, 1, 0, 0], note: String::new() },
+            web: Default::default(),
             notifs: vec![],
             crm: vec![],
             crm_q: String::new(),
@@ -544,14 +626,44 @@ impl App {
     }
 
     pub fn do_login(&mut self) {
-        let (u, p) = (self.l_user.trim().to_string(), self.l_pass.clone());
+        let (u, p, code) = (self.l_user.trim().to_string(), self.l_pass.clone(), self.l_code.trim().to_string());
         if u.is_empty() || p.is_empty() {
             self.connect_msg = "Kullanıcı adı ve şifre girin.".into();
             return;
         }
         self.connect_msg.clear();
-        self.bg(move |api| api.login(&u, &p), |app, r| match r {
-            Ok(rep) => app.after_login(rep.user),
+        let (pw_keep, cache_file) = (p.clone(), self.cache_file(&u));
+        self.bg(move |api| api.login(&u, &p, &code), move |app, r| match r {
+            Ok(rep) => {
+                app.need_code = false;
+                app.l_code.clear();
+                app.session_pw = pw_keep;
+                app.offline_session = false;
+                if let Some(f) = cache_file {
+                    crate::offline::start(f, &app.session_pw, rep.offline_ok, &serde_json::to_value(&rep.user).unwrap_or_default());
+                }
+                app.after_login(rep.user)
+            }
+            Err(e) if crate::outbox::is_conn_err(&e) && cache_file.is_some() => {
+                // Ana bilgisayara ulaşılamıyor: çevrimdışı kopya varsa onunla giriş dene
+                match crate::offline::login(cache_file.unwrap(), &pw_keep) {
+                    Ok(me) => match serde_json::from_value::<UserInfo>(me) {
+                        Ok(user) => {
+                            app.session_pw = pw_keep;
+                            app.offline_session = true;
+                            app.offline = true;
+                            app.after_login(user);
+                            app.toast(ti("Çevrimdışı oturum: ana bilgisayara ulaşılınca otomatik bağlanılacak."));
+                        }
+                        Err(_) => app.connect_msg = e,
+                    },
+                    Err(m) => app.connect_msg = if m.contains("kopya yok") { e } else { m },
+                }
+            }
+            Err(e) if e.contains("2FA_GEREKLI") => {
+                app.need_code = true;
+                app.connect_msg = ti("İki aşamalı doğrulama: telefondaki uygulamadan 6 haneli kodu girin.").to_string();
+            }
             Err(e) => app.connect_msg = e,
         });
     }
@@ -560,6 +672,11 @@ impl App {
         self.cfg.last_user = user.username.clone();
         self.cfg.save();
         self.me = user;
+        if let Some(d) = directories::ProjectDirs::from("tr", "Ofis", "EmlakOfis") {
+            let key: String = format!("{}_{}", self.cfg.server_addr, self.me.username).chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+            crate::outbox::init(d.config_dir().join("kuyruk").join(format!("{key}.json")));
+            self.last_flush = Instant::now() - Duration::from_secs(60);
+        }
         self.l_pass.clear();
         self.stage = Stage::Main;
         self.view = View::Home;
@@ -582,6 +699,9 @@ impl App {
         if let Some(api) = &self.api {
             api.set_token("");
         }
+        crate::offline::clear_memory();
+        self.session_pw.clear();
+        self.offline_session = false;
         self.stage = Stage::Login;
         self.me = UserInfo::default();
         self.portfolios.clear();
@@ -724,6 +844,7 @@ impl App {
                 self.load_users();
             }
             View::Audit => self.load_audit(),
+            View::Blog => self.web_load_tags(),
             View::Detail | View::Form => {}
         }
     }
@@ -834,6 +955,7 @@ impl App {
             TexKey::Thumb(id) => (format!("/api/photos/{id}?size=thumb"), 400),
             TexKey::Full(id) => (format!("/api/photos/{id}"), 1600),
             TexKey::User(id) => (format!("/api/users/{id}/photo"), 256),
+            TexKey::Crm(id) => (format!("/api/crm/{id}/photo"), 256),
             TexKey::Logo => ("/api/settings/logo".to_string(), 400),
             TexKey::Local(_) => (String::new(), 360),
         };
@@ -917,6 +1039,10 @@ impl App {
                 .frame(egui::Frame::new().fill(Color32::from_rgb(176, 42, 42)).inner_margin(Margin::symmetric(16, 5)))
                 .show(ctx, |ui| {
                     ui.label(RichText::new(ti("Ana bilgisayara ulaşılamıyor — Wi-Fi/ağ bağlantısını ve ana bilgisayarın açık olduğunu kontrol edin. Otomatik olarak yeniden deneniyor…")).color(Color32::WHITE));
+                    let n = crate::outbox::pending();
+                    if n > 0 {
+                        ui.label(RichText::new(format!("{} {}", n, ti("kayıt bu bilgisayarda bekliyor; bağlantı gelince otomatik gönderilecek."))).strong().color(Color32::WHITE));
+                    }
                 });
         }
 
@@ -930,6 +1056,10 @@ impl App {
                         ui.label(RichText::new(&t.text).color(c));
                     } else {
                         ui.label(RichText::new(ti("Hazır")).color(muted()));
+                    }
+                    let pend = crate::outbox::pending();
+                    if pend > 0 {
+                        ui.label(RichText::new(format!("⏳ {} {}", pend, ti("kayıt ana bilgisayara gönderilmeyi bekliyor"))).strong().color(Color32::from_rgb(214, 120, 20)));
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let (dot, txt) = if self.offline { (Color32::from_rgb(200, 60, 60), "Bağlantı yok") } else { (Color32::from_rgb(40, 160, 85), "Bağlı") };
@@ -1011,6 +1141,7 @@ impl App {
                     item(ui, ti("Çalışanlar"), View::Users, cur == View::Users);
                     item(ui, ti("İlçe / Mahalleler"), View::Locations, cur == View::Locations);
                     item(ui, ti("Komisyonlar"), View::Commissions, cur == View::Commissions);
+                    item(ui, ti("Blog yayınla"), View::Blog, cur == View::Blog);
                     item(ui, ti("Denetim kaydı"), View::Audit, cur == View::Audit);
                 }
                 ui.add_space(8.0);
@@ -1023,7 +1154,21 @@ impl App {
               });
             });
 
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(panel()).inner_margin(egui::Margin::same(18))).show(ctx, |ui| match self.view {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(panel()).inner_margin(egui::Margin::same(18))).show(ctx, |ui| {
+            // Pencere küçülünce içerik kesilmesin: yatay/dikey kaydırma çubukları çıkar.
+            let avail = ui.available_size();
+            let w = avail.x.max(820.0);
+            egui::ScrollArea::both().id_salt("page_scroll").auto_shrink([false, false]).show(ui, |ui| {
+                ui.set_min_width(w);
+                ui.set_max_width(w);
+                ui.set_max_height(avail.y);
+                self.ui_view(ui);
+            });
+        });
+    }
+
+    fn ui_view(&mut self, ui: &mut egui::Ui) {
+        match self.view {
             View::Home => self.ui_home(ui),
             View::Detail => self.ui_detail(ui),
             View::Form => self.ui_form(ui),
@@ -1044,7 +1189,8 @@ impl App {
             View::Map => self.ui_map(ui),
             View::Commissions => self.ui_commissions(ui),
             View::Audit => self.ui_audit(ui),
-        });
+            View::Blog => self.ui_blog(ui),
+        }
     }
 }
 
@@ -1054,8 +1200,46 @@ impl Filters {
     }
 }
 
+/// Linux (ibus/Compose) ile gelen ü, ş, ğ gibi harfler `Ime::Commit` olarak gelir;
+/// egui bunları, önceden `Preedit` görmediyse sessizce atar. Preedit yoksa
+/// commit'i düz metne çevirerek Türkçe karakterlerin yazılmasını sağlar.
+fn fix_ime_commit(raw: &mut egui::RawInput) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static PREEDIT: AtomicBool = AtomicBool::new(false);
+    for ev in raw.events.iter_mut() {
+        if let egui::Event::Ime(ime) = ev {
+            match ime {
+                egui::ImeEvent::Preedit(t) => PREEDIT.store(!t.is_empty(), Ordering::Relaxed),
+                egui::ImeEvent::Disabled => PREEDIT.store(false, Ordering::Relaxed),
+                egui::ImeEvent::Commit(t) => {
+                    let had = PREEDIT.swap(false, Ordering::Relaxed);
+                    if !had && !t.is_empty() && t != "\n" && t != "\r" {
+                        *ev = egui::Event::Text(std::mem::take(t));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 impl eframe::App for App {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        self.apply_text_action(ctx, raw_input);
+        fix_ime_commit(raw_input);
+    }
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if ctx.input(|i| i.viewport().close_requested()) {
+            crate::offline::save_if_dirty();
+        }
+        // Kapatma isteği: bekleyen kayıt varsa uyar
+        if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close && self.stage == Stage::Main && crate::outbox::pending() > 0 {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.close_ask = true;
+        }
+        if self.stage == Stage::Main {
+            self.seed_offline_maps(ctx);
+        }
         if self.ext.verify_pending {
             if let Some(m) = VERIFY_MARKER.get() {
                 if self.ext.born.elapsed() > crate::updater::VERIFY_AFTER {
@@ -1070,6 +1254,23 @@ impl eframe::App for App {
         while let Ok(cb) = self.rx.try_recv() {
             cb(self);
         }
+        self.outbox_tick(ctx);
+        self.offline_tick();
+        // Lisans: süre dolduysa program kilitlenir (ana bilgisayarda sunucu da yanıt vermez)
+        {
+            let t = crate::sign::today();
+            if self.cfg.last_seen.as_str() < t.as_str() {
+                self.cfg.last_seen = t;
+                self.cfg.save();
+            }
+            let exp = crate::sign::license_expired(&self.cfg.lic_until, &self.cfg.last_seen);
+            crate::common::LICENSE_LOCKED.store(exp, std::sync::atomic::Ordering::Relaxed);
+            if exp && self.stage != Stage::Welcome {
+                self.ui_license_locked(ctx);
+                ctx.request_repaint_after(Duration::from_secs(1));
+                return;
+            }
+        }
         match self.stage {
             Stage::Welcome => self.ui_welcome(ctx),
             Stage::Login => self.ui_login(ctx),
@@ -1078,6 +1279,7 @@ impl eframe::App for App {
                 self.ui_main(ctx);
             }
         }
+        self.text_context_menu(ctx);
         ctx.request_repaint_after(Duration::from_millis(1000));
     }
 }
@@ -1201,5 +1403,107 @@ pub fn num_to_text(v: f64) -> String {
         format!("{}", v.round() as i64)
     } else {
         format!("{}", v).replace('.', ",")
+    }
+}
+
+impl App {
+    /// Çevrimdışı kuyruk: periyodik gönderim, bildirimler ve kapatma uyarısı.
+    fn outbox_tick(&mut self, ctx: &egui::Context) {
+        if let Some(n) = crate::outbox::take_notice() {
+            self.toast(n);
+        }
+        if self.stage == Stage::Main && crate::outbox::pending() > 0 && self.last_flush.elapsed() >= Duration::from_secs(15) && !self.flush_busy {
+            self.last_flush = Instant::now();
+            self.flush_busy = true;
+            self.bg(
+                |api| crate::outbox::flush(&|m, p, b, by, at| api.send_queued(m, p, b, by, at)),
+                |app, out| {
+                    app.flush_busy = false;
+                    if out.sent > 0 {
+                        app.toast(format!("{} bekleyen kayıt ana bilgisayara gönderildi.", out.sent));
+                        app.refresh_current();
+                        app.load_crm();
+                    }
+                    for f in out.failed {
+                        app.err(format!("Bekleyen bir kayıt işlenemedi ve atlandı — {f}"));
+                    }
+                    if let Some(s) = out.stopped {
+                        if s.contains("Oturum süresi doldu") {
+                            app.err(s);
+                        }
+                    }
+                },
+            );
+        }
+        if self.close_ask {
+            let n = crate::outbox::pending();
+            if n == 0 {
+                self.close_ask = false;
+                return;
+            }
+            let mut close = false;
+            egui::Window::new(ti("Bekleyen kayıtlar var")).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+                ui.label(RichText::new(format!("{} {}", n, ti("kayıt henüz ana bilgisayara aktarılamadı."))).strong());
+                ui.label(ti("Programı şimdi kapatırsanız bu kayıtlar bu bilgisayarda saklanır ve program bir sonraki açılışta, ana bilgisayara ulaşılabildiğinde otomatik gönderilir. Bu bilgisayar silinir/değiştirilirse kayıtlar kaybolur."));
+                ui.horizontal(|ui| {
+                    if ui.button(ti("Şimdi göndermeyi dene")).clicked() {
+                        self.last_flush = Instant::now() - Duration::from_secs(60);
+                    }
+                    if ui.button(ti("Yine de kapat")).clicked() {
+                        close = true;
+                    }
+                    if ui.button(ti("Açık kalsın")).clicked() {
+                        self.close_ask = false;
+                    }
+                });
+            });
+            if close {
+                self.allow_close = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+    }
+}
+
+impl App {
+    /// Kullanıcıya ait şifreli çevrimdışı kopya dosyası
+    pub fn cache_file(&self, user: &str) -> Option<PathBuf> {
+        let d = directories::ProjectDirs::from("tr", "Ofis", "EmlakOfis")?;
+        let key: String = format!("{}_{}", self.cfg.server_addr, user.to_lowercase()).chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+        Some(d.config_dir().join("onbellek").join(format!("{key}.eoc")))
+    }
+
+    /// Çevrimdışı kopyayı periyodik kaydeder; çevrimdışı oturumda ana bilgisayara ulaşılınca otomatik oturum açar.
+    fn offline_tick(&mut self) {
+        if self.stage != Stage::Main {
+            return;
+        }
+        if self.last_cache_save.elapsed() >= Duration::from_secs(45) {
+            self.last_cache_save = Instant::now();
+            crate::offline::save_if_dirty();
+        }
+        if self.offline_session && !self.relogin_busy && !self.session_pw.is_empty() && self.last_flush.elapsed() >= Duration::from_secs(10) {
+            self.relogin_busy = true;
+            self.last_flush = Instant::now();
+            let (u, p) = (self.me.username.clone(), self.session_pw.clone());
+            self.bg(move |api| api.login(&u, &p, ""), |app, r| {
+                app.relogin_busy = false;
+                match r {
+                    Ok(_) => {
+                        app.offline_session = false;
+                        app.offline = false;
+                        app.toast(ti("Ana bilgisayara bağlanıldı."));
+                        app.last_flush = Instant::now() - Duration::from_secs(60);
+                        app.refresh_current();
+                        app.load_portfolios();
+                    }
+                    Err(e) if e.contains("2FA_GEREKLI") => {
+                        app.offline_session = false;
+                        app.err(ti("Ana bilgisayara ulaşıldı; iki aşamalı doğrulama gerektiği için çıkış yapıp yeniden giriş yapın.").to_string());
+                    }
+                    Err(_) => {}
+                }
+            });
+        }
     }
 }

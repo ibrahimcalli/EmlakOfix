@@ -1,0 +1,25 @@
+EMLAK OFİS — WINDOWS DERLEME VE KURULUM SİHİRBAZI
+=================================================
+Linux'ta çalışan program Windows'ta da aynı kaynak koddan derlenir. İki yol var:
+
+YOL 1 (önerilen, bilgisayarınıza hiçbir şey kurmadan): GitHub Actions
+ 1. Kaynağı GitHub'a yükleyin (GITHUB_ADIMLARI.txt).
+ 2. GitHub'da depo sayfası > "Actions" sekmesi > "Windows derleme ve kurulum sihirbazi" > "Run workflow".
+ 3. 10-15 dakika sonra işin sonunda "Artifacts" bölümünden "EmlakOfis-Windows" dosyasını indirin.
+    İçinde EmlakOfis-Kurulum-<sürüm>.exe (kurulum sihirbazı) ve emlak-ofis.exe vardır.
+ 4. Windows bilgisayarlarda kurulum .exe dosyasını çalıştırın: Sonraki > Sonraki > Kur.
+    - "Ana bilgisayar olacaksa güvenlik duvarına izin ver" kutusu yalnızca ana bilgisayarda işaretlenir.
+ Not: Derlemeden önce otomatik testler çalışır; bir test başarısız olursa kurulum dosyası üretilmez.
+
+YOL 2 (Windows bilgisayarda elle)
+ 1. https://rustup.rs adresinden Rust, Visual Studio Build Tools (C++ iş yükü) ve Inno Setup 6 kurun.
+ 2. Kaynak klasöründe:  cargo build --release
+ 3. Sihirbaz:  "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" kurulum_windows\emlak-ofis.iss
+    Çıktı: cikti\EmlakOfis-Kurulum-<sürüm>.exe
+
+BİLİNMESİ GEREKENLER
+ - Windows "tanınmayan yayıncı" (SmartScreen) uyarısı verebilir: "Ek bilgi" > "Yine de çalıştır". Uyarıyı
+   kaldırmak için ücretli kod imzalama sertifikası gerekir; ofis içi kullanımda şart değildir.
+ - Güncellemeler Windows'ta da Ayarlar > Hakkında ve güncelleme'den .zip ile yapılır; Windows paketi için
+   paketle_guncelleme.py'ye --windows emlak-ofis.exe verilir (GitHub Actions çıktısındaki exe).
+ - Ayarlar, veritabanı ve yedekler kurulum klasörüne değil kullanıcı klasörüne yazılır; kaldırınca silinmez.

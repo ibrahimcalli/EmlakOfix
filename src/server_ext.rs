@@ -171,6 +171,9 @@ pub fn route(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q:
 
 fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &HashMap<String, String>, body: &[u8]) -> R<Option<Resp>> {
     let now = now_str();
+    if let Some(r) = crate::web::route(db, me, method, segs, body)? {
+        return Ok(Some(r));
+    }
     match (method, segs) {
         // ================================================= PANEL
         ("GET", ["api", "dashboard"]) => {
@@ -372,6 +375,7 @@ fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &Ha
                     db.conn.execute("UPDATE photos SET position=?2 WHERE id=?1 AND portfolio_id=?3", params![pid, pos as i64, id])?;
                 }
             }
+            crate::web::push_bg(db, id);
             ok()
         }
         ("POST", ["api", "photos", id, "rotate"]) => {
@@ -397,6 +401,7 @@ fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &Ha
             };
             let thumb = img.resize(320, 320, image::imageops::FilterType::Triangle);
             db.conn.execute("UPDATE photos SET full=?2, thumb=?3 WHERE id=?1", params![id, enc(&img, 85)?, enc(&thumb, 78)?])?;
+            crate::web::push_bg(db, pid);
             ok()
         }
         ("GET", ["api", "map"]) => out(Value::Array(db.rows(
@@ -441,7 +446,9 @@ fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &Ha
             let to = q.get("to").cloned().unwrap_or_else(|| (chrono::Local::now() + CDur::days(31)).format("%Y-%m-%d").to_string());
             let sql = format!(
                 "SELECT a.*, {} AS user_name, COALESCE((SELECT title FROM portfolios p WHERE p.id=a.portfolio_id),'') AS portfolio_title, \
-                 COALESCE((SELECT full_name FROM buyers b WHERE b.id=a.buyer_id),'') AS buyer_name \
+                 COALESCE((SELECT full_name FROM buyers b WHERE b.id=a.buyer_id),'') AS buyer_name, \
+                 COALESCE((SELECT phone FROM buyers b WHERE b.id=a.buyer_id),'') AS buyer_phone, \
+                 COALESCE((SELECT email FROM buyers b WHERE b.id=a.buyer_id),'') AS buyer_email \
                  FROM appointments a WHERE substr(a.start_at,1,10)>=?1 AND substr(a.start_at,1,10)<=?2 ORDER BY a.start_at",
                 uname("a.user_id")
             );
@@ -520,13 +527,13 @@ fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &Ha
             if sd.is_err() || ed.is_err() || ed.unwrap() < sd.unwrap() {
                 return Err(ApiErr::bad("Geçerli bir tarih aralığı girin."));
             }
-            let status = if me.is_lead() { "Onaylandı" } else { "Bekliyor" };
+            let status = "Bekliyor"; // her talep önce yönetici onayına gider
             db.conn.execute(
                 "INSERT INTO leaves(user_id,kind,start_date,end_date,note,status,decided_by,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-                params![uid, vs(&v, "kind"), s, e, vs(&v, "note"), status, if me.is_lead() { me.id } else { 0 }, now],
+                params![uid, vs(&v, "kind"), s, e, vs(&v, "note"), status, 0, now],
             )?;
-            if !me.is_lead() {
-                for u in db.list_users()?.iter().filter(|u| u.active && u.is_lead()) {
+            {
+                for u in db.list_users()?.iter().filter(|u| u.active && u.is_lead() && u.id != me.id) {
                     let _ = db.notify(u.id, "İzin talebi", &format!("{} izin talep etti: {} – {} ({})", me.full_name(), s, e, vs(&v, "kind")));
                 }
             }
@@ -727,9 +734,17 @@ fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &Ha
             need_admin(me)?;
             out(json!({
                 "ext_backup_dir": db.external_backup_dir(),
+                "backup_keep": db.backup_keep(),
+                "rclone_remote": db.kv_get("rclone_remote").unwrap_or_default(),
+                "rclone_status": std::fs::read_to_string(db.backup_dir().join("rclone_son_durum.txt")).unwrap_or_default(),
+                "safe_backup_dir": db.safe_backup_dir().to_string_lossy(),
+                "ext_backup_overwrite": db.kv_get("ext_backup_overwrite").map(|s| s != "0").unwrap_or(true),
                 "ext_backup_pw_set": !db.kv_get("ext_backup_pw").unwrap_or_default().is_empty(),
                 "work_start": db.kv_get("work_start").unwrap_or_else(|| "09:30".into()),
                 "match_enabled": db.kv_get("match_enabled").map(|s| s != "0").unwrap_or(true),
+                "ip_allow": db.kv_get("ip_allow").unwrap_or_default(),
+                "offline_enabled": db.kv_get("offline_enabled").map(|v| v == "1").unwrap_or(false),
+                "remind_wa": db.kv_get("remind_wa").unwrap_or_else(|| crate::common::REMIND_DEFAULT.into()),
             }))
         }
         ("PUT", ["api", "settings", "ext"]) => {
@@ -737,6 +752,18 @@ fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &Ha
             let v = body_json(body)?;
             if v.get("ext_backup_dir").is_some() {
                 db.kv_set("ext_backup_dir", &vs(&v, "ext_backup_dir"))?;
+            }
+            if v.get("backup_keep").is_some() {
+                db.kv_set("backup_keep", &v["backup_keep"].as_i64().unwrap_or(14).to_string())?;
+            }
+            if v.get("rclone_remote").is_some() {
+                db.kv_set("rclone_remote", &vs(&v, "rclone_remote"))?;
+            }
+            if v.get("safe_backup_dir").is_some() {
+                db.kv_set("safe_backup_dir", &vs(&v, "safe_backup_dir"))?;
+            }
+            if v.get("ext_backup_overwrite").is_some() {
+                db.kv_set("ext_backup_overwrite", if vb(&v, "ext_backup_overwrite") { "1" } else { "0" })?;
             }
             if vb(&v, "clear_pw") {
                 db.kv_set("ext_backup_pw", "")?;
@@ -749,7 +776,21 @@ fn inner(st: &State, db: &Db, me: &UserInfo, method: &str, segs: &[&str], q: &Ha
             if v.get("match_enabled").is_some() {
                 db.kv_set("match_enabled", if vb(&v, "match_enabled") { "1" } else { "0" })?;
             }
-            aud(db, me, "Ayarlar değişti", "Yedekleme / mesai saati");
+            if v.get("offline_enabled").is_some() {
+                db.kv_set("offline_enabled", if vb(&v, "offline_enabled") { "1" } else { "0" })?;
+            }
+            if v.get("remind_wa").is_some() {
+                db.kv_set("remind_wa", &vs(&v, "remind_wa"))?;
+            }
+            if v.get("ip_allow").is_some() {
+                let raw = vs(&v, "ip_allow");
+                let bad = crate::common::ip_allow_invalid(&raw);
+                if !bad.is_empty() {
+                    return Err(ApiErr::bad(&format!("Geçersiz IP/ağ: {}", bad.join(", "))));
+                }
+                db.kv_set("ip_allow", &raw)?;
+            }
+            aud(db, me, "Ayarlar değişti", "Yedekleme / mesai saati / IP kısıtlama");
             ok()
         }
         ("POST", ["api", "backup", "external"]) => {
@@ -823,9 +864,22 @@ fn conflict(db: &Db, uid: i64, start: &str, dur: i64, ignore: i64) -> Option<Str
 
 /// Arka plan: randevu hatırlatması (30 dk kala) — sunucu açılışında bir kez başlatılır.
 pub fn start_background(st: std::sync::Arc<State>) {
+    let mut last_backup = std::time::Instant::now();
+    let mut last_mirror = std::time::Instant::now();
+    let mut first = true;
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_secs(60));
         let Ok(db) = st.db.lock() else { continue };
+        // Günlük otomatik yedek (sunucu açık kaldığı sürece; en yeni 30 yedek tutulur, harici klasör ayarlıysa oraya da kopyalanır)
+        if last_backup.elapsed() >= std::time::Duration::from_secs(24 * 3600) {
+            last_backup = std::time::Instant::now();
+            let _ = db.make_backup();
+        }
+        if last_mirror.elapsed() >= std::time::Duration::from_secs(120) || first {
+            last_mirror = std::time::Instant::now();
+            first = false;
+            let _ = crate::mirror::sync(&db, &st.data_dir);
+        }
         let now = chrono::Local::now().naive_local();
         let soon = (now + CDur::minutes(30)).format("%Y-%m-%d %H:%M").to_string();
         let nowf = now.format("%Y-%m-%d %H:%M").to_string();

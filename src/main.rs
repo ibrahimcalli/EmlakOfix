@@ -3,6 +3,14 @@
 
 mod api;
 mod bgimg;
+mod totp;
+mod monthly;
+mod mirror;
+mod outbox;
+mod offline;
+mod ui_ctx;
+mod ui_offmap;
+mod ui_totp;
 mod ui_brand;
 mod app;
 mod common;
@@ -17,6 +25,8 @@ mod tls;
 mod ext_db;
 mod server;
 mod server_ext;
+mod web;
+mod ui_web;
 mod ui_ext;
 mod ui_ext2;
 mod ui_map;
@@ -54,6 +64,31 @@ fn main() -> eframe::Result<()> {
     if args.iter().any(|a| a == "--geri-yukle") {
         restore::run_cli(&args);
     }
+    // Kurtarma: kullanıcının iki aşamalı doğrulamasını ana bilgisayarda kapatır:
+    //   emlak-ofis --2fa-sifirla <kullanıcı adı> [--veri <klasör>]   (program kapalıyken çalıştırın)
+    if let Some(user) = arg_value(&args, &["--2fa-sifirla"]) {
+        let dir = arg_value(&args, &["--veri"]).map(PathBuf::from).unwrap_or_else(app::default_data_dir);
+        let code = match db::Db::open(&dir.join("emlak.db")) {
+            Ok(d) => match d.user_login_row(&user) {
+                Ok(Some((u, _))) => {
+                    let _ = d.kv_set(&format!("totp_on_{}", u.id), "0");
+                    let _ = d.kv_set(&format!("totp_{}", u.id), "");
+                    d.audit(u.id, &u.full_name(), "İki aşamalı doğrulama sıfırlandı", "ana bilgisayardan (komut satırı)");
+                    println!("'{}' kullanıcısının iki aşamalı doğrulaması kapatıldı.", u.username);
+                    0
+                }
+                _ => {
+                    eprintln!("Kullanıcı bulunamadı: {user}");
+                    2
+                }
+            },
+            Err(e) => {
+                eprintln!("Veritabanı açılamadı: {}", e.1);
+                1
+            }
+        };
+        std::process::exit(code);
+    }
     // Arayüzsüz güncelleme: emlak-ofis --guncelle-paket <paket.zip>
     if let Some(z) = arg_value(&args, &["--guncelle-paket"]) {
         let pkg = match updater::read_package(std::path::Path::new(&z)) {
@@ -82,6 +117,20 @@ fn main() -> eframe::Result<()> {
     }
     if let Some(pre) = arg_value(&args, &["--anahtar-uret"]) {
         match sign::cli_generate(&pre) {
+            Ok(_) => std::process::exit(0),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+    }
+    if let Some(i) = args.iter().position(|a| a == "--kod-uret") {
+        let g = |n: usize| args.get(i + n).cloned().unwrap_or_default();
+        if args.len() < i + 5 {
+            eprintln!("Kullanım: emlak-ofis --kod-uret <gizli-anahtar-dosyası> <H|K> <kurulum-günü> <lisans-günü> [not]\n  H = yönetici, K = kullanıcı; gün 0 = süresiz");
+            std::process::exit(1);
+        }
+        match sign::cli_make_code(&g(1), &g(2), &g(3), &g(4), &g(5)) {
             Ok(_) => std::process::exit(0),
             Err(e) => {
                 eprintln!("{e}");
@@ -144,7 +193,7 @@ fn main() -> eframe::Result<()> {
             .with_app_id("emlak-ofis")
             .with_icon(app_icon())
             .with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([980.0, 620.0]),
+            .with_min_inner_size([700.0, 480.0]),
         ..Default::default()
     };
     bgimg::install_linux_icon();

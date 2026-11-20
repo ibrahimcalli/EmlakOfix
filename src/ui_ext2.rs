@@ -338,29 +338,61 @@ impl App {
 
     // ---------------------------------------------------------- İLAN METNİ
     pub fn listing_text_ui(&mut self, ui: &mut Ui, p: &Portfolio) {
-        let mut t = format!("{}\n{} {} — {} / {}\n", p.title, p.listing_type, p.category, p.district, p.neighborhood);
-        t.push_str(&format!("Fiyat: {}\n", fmt_price(p.price, &p.currency)));
-        if p.gross_m2 > 0.0 {
-            t.push_str(&format!("Brüt {} m²", p.gross_m2));
-            if p.net_m2 > 0.0 {
-                t.push_str(&format!(" / Net {} m²", p.net_m2));
+        use crate::i18n_doc::Lang;
+        // Türkçe: mevcut hazır metin; İngilizce/Rusça: çevrilmiş etiketler + o dildeki açıklama
+        let tr_text = {
+            let mut t = format!("{}\n{} {} — {} / {}\n", p.title, p.listing_type, p.category, p.district, p.neighborhood);
+            t.push_str(&format!("Fiyat: {}\n", fmt_price(p.price, &p.currency)));
+            if p.gross_m2 > 0.0 {
+                t.push_str(&format!("Brüt {} m²", p.gross_m2));
+                if p.net_m2 > 0.0 {
+                    t.push_str(&format!(" / Net {} m²", p.net_m2));
+                }
+                t.push('\n');
             }
-            t.push('\n');
-        }
-        if !p.rooms.is_empty() {
-            t.push_str(&format!("Oda: {}\n", p.rooms));
-        }
-        for (l, v) in [("Bina yaşı", &p.building_age), ("Kat", &p.floor), ("Isıtma", &p.heating), ("Tapu", &p.deed_status)] {
-            if !v.is_empty() {
-                t.push_str(&format!("{l}: {v}\n"));
+            if !p.rooms.is_empty() {
+                t.push_str(&format!("Oda: {}\n", p.rooms));
             }
-        }
-        if !p.description.trim().is_empty() {
-            t.push_str(&format!("\n{}\n", p.description.trim()));
-        }
+            for (l, v) in [("Bina yaşı", &p.building_age), ("Kat", &p.floor), ("Isıtma", &p.heating), ("Tapu", &p.deed_status)] {
+                if !v.is_empty() {
+                    t.push_str(&format!("{l}: {v}\n"));
+                }
+            }
+            if !p.description.trim().is_empty() {
+                t.push_str(&format!("\n{}\n", p.description.trim()));
+            }
+            t
+        };
+        let foreign = |lg: Lang| -> String {
+            let mut t = format!("{}\n", p.title);
+            t.push_str(&format!("{}\n", crate::export::price_str(lg, p.price, &p.currency)));
+            for (l, v) in crate::export::detail_rows(p, lg) {
+                if !v.trim().is_empty() {
+                    t.push_str(&format!("{l}: {v}\n"));
+                }
+            }
+            let d = match lg { Lang::En => p.description_en.trim(), _ => p.description_ru.trim() };
+            if !d.is_empty() {
+                t.push_str(&format!("\n{d}\n"));
+            }
+            t
+        };
+        let tabs = [("Türkçe", p.description.trim().is_empty()), ("English", p.description_en.trim().is_empty()), ("Русский", p.description_ru.trim().is_empty())];
+        let mut t = match self.listing_lang { 1 => foreign(Lang::En), 2 => foreign(Lang::Ru), _ => tr_text };
         t.push_str(&format!("\n{} • {}", self.settings.office_name, self.me.full_name()));
-        panel_box(ui, ti("İlan metni"), ti("Sahibinden / Hepsiemlak / sosyal medya için hazır metin."), |ui| {
-            ui.add(egui::TextEdit::multiline(&mut t.clone()).desired_rows(6).desired_width(f32::INFINITY).interactive(false));
+        panel_box(ui, ti("İlan metni"), ti("Sahibinden / Hepsiemlak / sosyal medya için hazır metin. Dil sekmesini seçin."), |ui| {
+            ui.horizontal(|ui| {
+                for (i, (name, empty)) in tabs.iter().enumerate() {
+                    let label = if *empty && i > 0 { format!("{name} ·") } else { name.to_string() };
+                    if ui.selectable_label(self.listing_lang == i as u8, label).clicked() {
+                        self.listing_lang = i as u8;
+                    }
+                }
+            });
+            if self.listing_lang == 1 && p.description_en.trim().is_empty() || self.listing_lang == 2 && p.description_ru.trim().is_empty() {
+                ui.label(RichText::new(ti("Bu dilde açıklama girilmemiş (Düzenle > açıklama sekmeleri).")).small().color(muted()));
+            }
+            ui.add(egui::TextEdit::multiline(&mut t.clone()).desired_rows(8).desired_width(f32::INFINITY).interactive(false));
             if ui.button(ti("Metni kopyala")).clicked() {
                 ui.ctx().copy_text(t.clone());
                 self.toast(ti("İlan metni panoya kopyalandı."));
@@ -428,9 +460,17 @@ impl App {
         self.call(|api| api.get::<Value>("/api/settings/ext"), |app, v| {
             let e = &mut app.ext.ext_set;
             e.dir = js(&v, "ext_backup_dir");
+            e.safe_dir = js(&v, "safe_backup_dir");
+            e.keep = v["backup_keep"].as_i64().unwrap_or(14);
+            e.rclone = js(&v, "rclone_remote");
+            e.rclone_status = js(&v, "rclone_status");
+            e.overwrite = v["ext_backup_overwrite"].as_bool().unwrap_or(true);
             e.pw_set = v["ext_backup_pw_set"].as_bool().unwrap_or(false);
             e.work_start = js(&v, "work_start");
             e.match_enabled = v["match_enabled"].as_bool().unwrap_or(true);
+            e.ip_allow = js(&v, "ip_allow");
+            e.offline_enabled = v["offline_enabled"].as_bool().unwrap_or(false);
+            e.remind_wa = js(&v, "remind_wa");
             e.pw.clear();
             e.clear_pw = false;
             e.loaded = true;
@@ -447,7 +487,27 @@ impl App {
         }
         let mut e = self.ext.ext_set.clone();
         let mut act = 0;
-        panel_box(ui, ti("Harici yedek (şifreli)"), ti("Her yedek ayrıca bu klasöre kopyalanır (USB bellek, NAS, bulut eşitleme klasörü vb.). Parola girilirse dosya şifrelenir (.db.enc)."), |ui| {
+        panel_box(ui, ti("Güvenli yerel yedek (1. kopya)"), ti("Her yedek ayrıca Belgeler içindeki bu klasöre kopyalanır; program kaldırılsa/yeniden kurulsa bile silinmez. Tutulacak kopya sayısı aşağıda ayarlanır."), |ui| {
+            ui.horizontal(|ui| {
+                ui.label(ti("Klasör"));
+                ui.add(egui::TextEdit::singleline(&mut e.safe_dir).desired_width(420.0));
+            });
+            ui.horizontal(|ui| {
+                ui.label(ti("Tutulacak yedek sayısı"));
+                ui.add(egui::DragValue::new(&mut e.keep).range(2..=365));
+                ui.label(RichText::new(ti("(her yedek veritabanının tam kopyasıdır; fotoğraflar çoksa küçük tutun)")).small().color(muted()));
+            });
+        });
+        panel_box(ui, ti("Bulut / harici yedek (2. kopya, şifreli)"), ti("Her yedek ayrıca bu klasöre kopyalanır: Google Drive/OneDrive/Dropbox eşitleme klasörü, USB bellek, NAS vb. Parola girilirse dosya şifrelenir (.db.enc), buluta güvenle koyabilirsiniz."), |ui| {
+            ui.checkbox(&mut e.overwrite, ti("Yeni yedek eskisinin üzerine yazsın (tek dosya: emlak_son_yedek)"));
+            ui.horizontal(|ui| {
+                ui.label(ti("rclone hedefi (ör. gdrive:EmlakOfisYedek)"));
+                ui.add(egui::TextEdit::singleline(&mut e.rclone).desired_width(260.0).hint_text("gdrive:EmlakOfisYedek"));
+            });
+            ui.label(RichText::new(ti("Google Drive'a doğrudan yükleme: ana bilgisayarda rclone kurup bir kez 'rclone config' ile Drive hesabınızı bağlayın; yedek parolası şarttır (veri şifreli gider).")).small().color(muted()));
+            if !e.rclone_status.is_empty() {
+                ui.label(RichText::new(format!("rclone: {}", e.rclone_status)).small().color(muted()));
+            }
             ui.horizontal(|ui| {
                 ui.label(ti("Klasör"));
                 ui.add(egui::TextEdit::singleline(&mut e.dir).desired_width(340.0).hint_text(ti("/media/usb/yedek")));
@@ -474,8 +534,31 @@ impl App {
                 }
             });
         });
-        if act == 1 {
-            let body = json!({"ext_backup_dir": e.dir, "ext_backup_pw": e.pw, "clear_pw": e.clear_pw, "work_start": e.work_start, "match_enabled": e.match_enabled});
+        panel_box(ui, ti("Çevrimdışı giriş ve yerel veri kopyası"), ti("Açıkken her kullanıcının bilgisayarı, son bilinen verileri KENDİ parolasından türetilen anahtarla şifreli saklar. Ana bilgisayar kapalıyken bile aynı parolayla giriş yapılır, kayıtlar görüntülenir, yeni işlemler kuyruğa alınır ve bağlantı gelince gönderilir. Kapatılırsa kullanıcı bilgisayarlarındaki kopyalar bir sonraki girişte silinir. Not: açık olduğunda müşteri/portföy verisinin şifreli bir kopyası çalışan bilgisayarlarında bulunur."), |ui| {
+            if ui.checkbox(&mut e.offline_enabled, ti("Çevrimdışı giriş ve yerel kopya açık")).changed() {
+                act = 5;
+            }
+        });
+        panel_box(ui, ti("IP kısıtlama"), ti("Boş bırakırsanız tüm bağlantılara izin verilir. Doluysa yalnızca listedeki IP/ağlardan bağlanılabilir (her satıra bir kayıt: 203.0.113.7 veya 192.168.1.0/24). Ana bilgisayarın kendisi her zaman erişebilir. DİKKAT: kendi IP'nizi listeye eklemeyi unutmayın; Tailscale kullanıyorsanız 100.64.0.0/10 ekleyin."), |ui| {
+            ui.add(egui::TextEdit::multiline(&mut e.ip_allow).desired_rows(3).desired_width(360.0).hint_text("192.168.1.0/24\n100.64.0.0/10"));
+            if primary(ui, ti("IP listesini kaydet")) {
+                act = 3;
+            }
+        });
+        panel_box(ui, ti("Hatırlatma metni (WhatsApp / e-posta)"), ti("Randevu kartındaki 'WhatsApp hatırlat' ve 'E-posta hatırlat' düğmeleri bu metni kullanır. Yer tutucular: {ad} {baslik} {tarih} {saat} {ofis}"), |ui| {
+            ui.add(egui::TextEdit::multiline(&mut e.remind_wa).desired_rows(3).desired_width(420.0));
+            if primary(ui, ti("Metni kaydet")) {
+                act = 4;
+            }
+        });
+        if act == 3 || act == 4 || act == 5 {
+            let body = match act { 3 => json!({"ip_allow": e.ip_allow}), 4 => json!({"remind_wa": e.remind_wa}), _ => json!({"offline_enabled": e.offline_enabled}) };
+            self.call(move |api| api.put("/api/settings/ext", &body), |app, _| {
+                app.toast(ti("Kaydedildi."));
+                app.ext.ext_set.loaded = false;
+            });
+        } else if act == 1 {
+            let body = json!({"ext_backup_dir": e.dir, "safe_backup_dir": e.safe_dir, "backup_keep": e.keep, "rclone_remote": e.rclone, "ext_backup_overwrite": e.overwrite, "ext_backup_pw": e.pw, "clear_pw": e.clear_pw, "work_start": e.work_start, "match_enabled": e.match_enabled});
             self.call(move |api| api.put("/api/settings/ext", &body), |app, _| {
                 app.toast(ti("Kaydedildi."));
                 app.ext.ext_set.loaded = false;
@@ -727,7 +810,103 @@ impl App {
             } else {
                 ui.label(RichText::new(ti("İmza denetimi AÇIK: imzasız veya başka anahtarla imzalı paket reddedilir.")).small().color(Color32::from_rgb(34, 139, 70)));
             }
+            ui.horizontal_wrapped(|ui| {
+                if ui.button(ti("Yeni anahtar çifti üret")).clicked() {
+                    let dir = directories::UserDirs::new().and_then(|u| u.document_dir().map(|d| d.to_path_buf())).unwrap_or_else(|| std::path::PathBuf::from(".")).join("Emlak Ofis Anahtar");
+                    match crate::sign::generate_into(&dir) {
+                        Ok((p, public)) => {
+                            self.cfg.trusted_key = public;
+                            crate::updater::set_trusted_key(&self.cfg.trusted_key);
+                            self.cfg.save();
+                            self.toast(format!("Gizli anahtar yazıldı: {} — YEDEKLEYİN, kimseyle paylaşmayın.", p.display()));
+                        }
+                        Err(e) => self.err(e),
+                    }
+                }
+                if ui.button(ti("Güncelleme paketini imzala…")).clicked() {
+                    self.pick_files("İmzalanacak güncelleme paketi (.zip)", &["zip"], false, |app, zips| {
+                        if let Some(z) = zips.into_iter().next() {
+                            app.pick_files("Gizli anahtar dosyası (.gizli)", &["gizli", "txt", "key"], false, move |app, keys| {
+                                if let Some(k) = keys.into_iter().next() {
+                                    match crate::sign::cli_sign_package(&z.to_string_lossy(), &k.to_string_lossy()) {
+                                        Ok(()) => app.toast(ti("Paket imzalandı.")),
+                                        Err(e) => app.err(e),
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
             ui.label(RichText::new(ti("Anahtar üretme (bir kez): emlak-ofis --anahtar-uret anahtarim  → anahtarim.gizli (saklayın, paylaşmayın) + açık anahtar ekrana basılır.\nPaket imzalama: emlak-ofis --paket-imzala EmlakOfis-Guncelleme-X.zip anahtarim.gizli")).small().color(muted()));
+        });
+        self.web_settings_ui(ui);
+        panel_box(ui, ti("Kurulum ve lisans kodları"), ti("Her yeni kurulum bir kodla açılır: ana bilgisayar için YÖNETİCİ kodu, diğer bilgisayarlar için KULLANICI kodu. Kodsuz kurulum yapılamaz. Kodda iki ayrı süre vardır: (1) kodun kurulumda kullanılabileceği gün sayısı, (2) programın çalışabileceği gün sayısı (lisans bitiş tarihi). Lisans bitince program kilitlenir; yeni kod girilince devam eder, veri silinmez."), |ui| {
+            if crate::sign::host_key(&self.cfg.trusted_key).is_empty() {
+                ui.label(RichText::new(ti("Koruma KAPALI: önce yukarıya güvenilir yayıncı (açık) anahtarını girin.")).small().color(Color32::from_rgb(200, 130, 20)));
+            }
+            match crate::sign::license_days_left(&self.cfg.lic_until) {
+                Some(d) => {
+                    ui.label(RichText::new(format!("{} {} ({} {})", ti("Bu kurulumun lisans bitişi:"), self.cfg.lic_until, d.max(0), ti("gün kaldı"))).color(if d <= 14 { Color32::from_rgb(200, 90, 20) } else { muted() }));
+                }
+                None => {
+                    ui.label(RichText::new(ti("Bu kurulumun lisansı: süresiz")).color(muted()));
+                }
+            }
+            ui.horizontal(|ui| {
+                ui.label(ti("Kod türü:"));
+                ui.selectable_value(&mut self.ext.code_kind, 0, ti("Yönetici (ana bilgisayar)"));
+                ui.selectable_value(&mut self.ext.code_kind, 1, ti("Kullanıcı (istemci)"));
+            });
+            ui.horizontal_wrapped(|ui| {
+                ui.label(ti("Kod kaç gün içinde kullanılabilsin (0 = süresiz):"));
+                ui.add(egui::DragValue::new(&mut self.ext.host_days).range(0..=3650));
+                ui.label(ti("Program kaç gün çalışabilsin (0 = süresiz):"));
+                ui.add(egui::DragValue::new(&mut self.ext.lic_days).range(0..=3650));
+            });
+            ui.horizontal(|ui| {
+                ui.label(ti("Not (kime/hangi ofis):"));
+                ui.add(egui::TextEdit::singleline(&mut self.ext.host_note).desired_width(200.0));
+            });
+            if primary(ui, ti("Gizli anahtar dosyasını seç ve kod üret…")) {
+                self.pick_files("Gizli anahtar dosyası", &["gizli", "txt", "key"], false, |app, files| {
+                    if let Some(f) = files.into_iter().next() {
+                        let kind = if app.ext.code_kind == 0 { 'H' } else { 'K' };
+                        match std::fs::read_to_string(&f).map_err(|e| e.to_string()).and_then(|k| crate::sign::make_code(&k, kind, app.ext.host_days, app.ext.lic_days, &app.ext.host_note)) {
+                            Ok(c) => app.ext.host_code = c,
+                            Err(e) => app.err(e),
+                        }
+                    }
+                });
+            }
+            if !self.ext.host_code.is_empty() {
+                let mut c = self.ext.host_code.clone();
+                ui.add(egui::TextEdit::multiline(&mut c).desired_rows(3).desired_width(f32::INFINITY));
+                if ui.button(ti("Kodu kopyala")).clicked() {
+                    ui.ctx().copy_text(self.ext.host_code.clone());
+                    self.toast(ti("Kod kopyalandı."));
+                }
+                ui.label(RichText::new(ti("Kodu yalnızca ilgili kişiye iletin. Üretilen kod çevrimdışı geri çağrılamaz; bu yüzden 'program kaç gün çalışabilsin' sınırı asıl denetimdir.")).small().color(muted()));
+            }
+            ui.separator();
+            ui.label(RichText::new(ti("Bu kuruluma yeni/uzatılmış lisans kodu gir (yenileme):")).small());
+            ui.horizontal(|ui| {
+                ui.add(egui::TextEdit::singleline(&mut self.lic_code).hint_text("EO-…").desired_width(300.0));
+                if ui.button(ti("Uygula")).clicked() {
+                    let key = crate::sign::host_key(&self.cfg.trusted_key);
+                    match crate::sign::verify_code(&key, &self.lic_code) {
+                        Ok(i) if i.kind == 'H' || self.cfg.mode != "server" => {
+                            self.cfg.lic_until = if i.license_until == crate::sign::NO_LIMIT { String::new() } else { i.license_until };
+                            self.cfg.lic_kind = i.kind.to_string();
+                            self.cfg.save();
+                            self.lic_code.clear();
+                            self.toast(ti("Lisans güncellendi."));
+                        }
+                        Ok(_) => self.err("Ana bilgisayar için YÖNETİCİ kodu gerekir.".to_string()),
+                        Err(e) => self.err(e),
+                    }
+                }
+            });
         });
         if let Some(p) = install {
             self.ext.upd_pkg = None;

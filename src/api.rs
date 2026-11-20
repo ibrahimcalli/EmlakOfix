@@ -37,7 +37,7 @@ pub fn forget_pin(addr: &str) {
 
 impl Api {
     fn build(base: String, tls: Option<(Arc<rustls::ClientConfig>, Arc<Mutex<Option<String>>>)>) -> Api {
-        let mut b = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(4)).timeout(Duration::from_secs(90));
+        let mut b = ureq::AgentBuilder::new().user_agent(&format!("Emlak Ofis {} ({})", env!("CARGO_PKG_VERSION"), std::env::consts::OS)).timeout_connect(Duration::from_secs(4)).timeout(Duration::from_secs(90));
         let mut seen_fp = None;
         if let Some((cfg, seen)) = tls {
             b = b.tls_config(cfg);
@@ -116,8 +116,22 @@ impl Api {
     }
 
     pub fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
-        let r = Self::fin(self.req("GET", path).call())?;
-        r.into_json::<T>().map_err(|e| format!("Yanıt okunamadı: {e}"))
+        match Self::fin(self.req("GET", path).call()) {
+            Ok(r) => {
+                if crate::offline::enabled() && crate::offline::cacheable(path) {
+                    let v: Value = r.into_json().map_err(|e| format!("Yanıt okunamadı: {e}"))?;
+                    crate::offline::put(path, &v);
+                    serde_json::from_value(v).map_err(|e| format!("Yanıt okunamadı: {e}"))
+                } else {
+                    r.into_json::<T>().map_err(|e| format!("Yanıt okunamadı: {e}"))
+                }
+            }
+            Err(e) if crate::outbox::is_conn_err(&e) && crate::offline::cacheable(path) => match crate::offline::get(path).and_then(|v| serde_json::from_value(v).ok()) {
+                Some(t) => Ok(t),
+                None => Err(e),
+            },
+            Err(e) => Err(e),
+        }
     }
 
     pub fn send<B: Serialize, T: DeserializeOwned>(&self, method: &str, path: &str, body: &B) -> Result<T, String> {
@@ -126,15 +140,38 @@ impl Api {
         r.into_json::<T>().map_err(|e| format!("Yanıt okunamadı: {e}"))
     }
 
+    /// JSON gövdeli yazma işlemi; bağlantı yoksa ve işlem kuyruğa uygunsa çevrimdışı kuyruğa alınır.
+    fn mutate<B: Serialize>(&self, method: &str, path: &str, body: &B) -> Result<Value, String> {
+        match self.send::<B, Value>(method, path, body) {
+            Err(e) if crate::outbox::is_conn_err(&e) && crate::outbox::queueable(method, path) => {
+                Ok(crate::outbox::enqueue(method, path, serde_json::to_value(body).ok(), None))
+            }
+            r => r,
+        }
+    }
     pub fn post<B: Serialize>(&self, path: &str, body: &B) -> Result<Value, String> {
-        self.send("POST", path, body)
+        self.mutate("POST", path, body)
     }
     pub fn put<B: Serialize>(&self, path: &str, body: &B) -> Result<Value, String> {
-        self.send("PUT", path, body)
+        self.mutate("PUT", path, body)
     }
     pub fn delete(&self, path: &str) -> Result<Value, String> {
-        let r = Self::fin(self.req("DELETE", path).call())?;
-        r.into_json::<Value>().map_err(|e| e.to_string())
+        let r = Self::fin(self.req("DELETE", path).call());
+        match r {
+            Err(e) if crate::outbox::is_conn_err(&e) && crate::outbox::queueable("DELETE", path) => Ok(crate::outbox::enqueue("DELETE", path, None, None)),
+            r => r?.into_json::<Value>().map_err(|e| e.to_string()),
+        }
+    }
+
+    /// Kuyruktaki bir işlemi (kuyruğa geri almadan) gönderir; kayıt zamanı sunucuya denetim kaydı için iletilir.
+    pub fn send_queued(&self, method: &str, path: &str, body: Option<&Value>, bytes: Option<&[u8]>, at: &str) -> Result<Value, String> {
+        let r = self.req(method, path).set("X-Offline-At", &at.replace(['\n', '\r'], " "));
+        let resp = match (body, bytes) {
+            (_, Some(b)) => Self::fin(r.set("Content-Type", "application/octet-stream").send_bytes(b))?,
+            (Some(v), None) => Self::fin(r.send_json(v.clone()))?,
+            (None, None) => Self::fin(r.call())?,
+        };
+        resp.into_json::<Value>().map_err(|e| e.to_string())
     }
 
     pub fn get_bytes(&self, path: &str) -> Result<Vec<u8>, String> {
@@ -145,8 +182,11 @@ impl Api {
     }
 
     pub fn send_bytes(&self, method: &str, path: &str, bytes: &[u8]) -> Result<Value, String> {
-        let r = Self::fin(self.req(method, path).set("Content-Type", "application/octet-stream").send_bytes(bytes))?;
-        r.into_json::<Value>().map_err(|e| e.to_string())
+        let r = Self::fin(self.req(method, path).set("Content-Type", "application/octet-stream").send_bytes(bytes));
+        match r {
+            Err(e) if crate::outbox::is_conn_err(&e) && crate::outbox::queueable(method, path) => Ok(crate::outbox::enqueue(method, path, None, Some(bytes))),
+            r => r?.into_json::<Value>().map_err(|e| e.to_string()),
+        }
     }
 
     pub fn ping(&self) -> Result<Ping, String> {
@@ -154,8 +194,8 @@ impl Api {
         r.into_json::<Ping>().map_err(|e| e.to_string())
     }
 
-    pub fn login(&self, username: &str, password: &str) -> Result<LoginReply, String> {
-        let rep: LoginReply = self.send("POST", "/api/login", &serde_json::json!({"username": username, "password": password}))?;
+    pub fn login(&self, username: &str, password: &str, code: &str) -> Result<LoginReply, String> {
+        let rep: LoginReply = self.send("POST", "/api/login", &serde_json::json!({"username": username, "password": password, "code": code}))?;
         self.set_token(&rep.token);
         Ok(rep)
     }

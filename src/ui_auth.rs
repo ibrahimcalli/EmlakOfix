@@ -73,7 +73,14 @@ impl App {
                             }
                         });
                     }
-                    ui.add_space(12.0);
+                    ui.add_space(8.0);
+                    let need = (self.w_mode == 0 && !self.cfg.host_ok) || (self.w_mode == 1 && !self.cfg.client_ok && !self.cfg.host_ok);
+                    if need && !crate::sign::host_key(&self.cfg.trusted_key).is_empty() {
+                        ui.label(RichText::new(ti("Kurulum kodu (Ayarlar > Kurulum ve lisans kodları bölümünden yönetici üretir):")).strong());
+                        ui.add(egui::TextEdit::singleline(&mut self.w_code).hint_text("EO-…").desired_width(f32::INFINITY));
+                        ui.label(RichText::new(if self.w_mode == 0 { ti("Ana bilgisayar için YÖNETİCİ kodu gerekir. Kodsuz kurulum yapılamaz.") } else { ti("Bağlanmak için KULLANICI (veya yönetici) kodu gerekir. Kodsuz kurulum yapılamaz.") }).small().color(muted()));
+                    }
+                    ui.add_space(4.0);
                     if !self.connect_msg.is_empty() {
                         ui.colored_label(Color32::from_rgb(190, 40, 40), &self.connect_msg);
                     }
@@ -98,14 +105,73 @@ impl App {
                 self.connect_msg = "Ana bilgisayarın adresini yazın.".into();
                 return;
             }
+            if let Err(e) = self.activate_code(false) {
+                self.connect_msg = e;
+                return;
+            }
             self.cfg.mode = "client".into();
             self.cfg.server_addr = self.w_addr.trim().to_string();
         } else {
+            if let Err(e) = self.activate_code(true) {
+                self.connect_msg = e;
+                return;
+            }
             self.cfg.mode = "server".into();
             self.cfg.port = port;
         }
+        self.w_code.clear();
         self.cfg.save();
         self.connect();
+    }
+
+    /// Kodu doğrular ve etkinleştirir. host=true: ana bilgisayar (yalnızca yönetici kodu).
+    pub fn activate_code(&mut self, host: bool) -> Result<(), String> {
+        let key = crate::sign::host_key(&self.cfg.trusted_key);
+        let already = if host { self.cfg.host_ok } else { self.cfg.client_ok || self.cfg.host_ok };
+        if key.is_empty() || already {
+            return Ok(());
+        }
+        let info = crate::sign::verify_code(&key, &self.w_code)?;
+        if host && info.kind != 'H' {
+            return Err("Bu bir KULLANICI kodu; ana bilgisayar için YÖNETİCİ kodu gerekir.".into());
+        }
+        if host { self.cfg.host_ok = true } else { self.cfg.client_ok = true }
+        self.cfg.lic_kind = info.kind.to_string();
+        self.cfg.lic_until = if info.license_until == crate::sign::NO_LIMIT { String::new() } else { info.license_until };
+        Ok(())
+    }
+
+    /// Lisans süresi dolunca gösterilen kilit ekranı: yeni kod girilince açılır.
+    pub fn ui_license_locked(&mut self, ctx: &egui::Context) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.add_space(60.0);
+            ui.vertical_centered(|ui| {
+                ui.set_max_width(520.0);
+                ui.label(RichText::new(ti("Lisans süresi doldu")).size(26.0).strong());
+                ui.label(RichText::new(format!("{} {}", ti("Bu kurulumun lisans bitiş tarihi:"), self.cfg.lic_until)).color(muted()));
+                ui.add_space(8.0);
+                ui.label(ti("Devam etmek için yöneticiden yeni bir kod alıp aşağıya yapıştırın. Verileriniz silinmez; kod girilince kaldığınız yerden devam edersiniz."));
+                ui.add_space(8.0);
+                ui.add(egui::TextEdit::singleline(&mut self.lic_code).hint_text("EO-…").desired_width(f32::INFINITY));
+                if !self.lic_msg.is_empty() {
+                    ui.colored_label(Color32::from_rgb(190, 40, 40), &self.lic_msg);
+                }
+                if ui.add_sized([200.0, 32.0], egui::Button::new(ti("Kodu uygula"))).clicked() {
+                    let key = crate::sign::host_key(&self.cfg.trusted_key);
+                    match crate::sign::verify_code(&key, &self.lic_code) {
+                        Ok(i) if i.kind == 'H' || self.cfg.mode != "server" => {
+                            self.cfg.lic_until = if i.license_until == crate::sign::NO_LIMIT { String::new() } else { i.license_until };
+                            self.cfg.lic_kind = i.kind.to_string();
+                            self.cfg.save();
+                            self.lic_code.clear();
+                            self.lic_msg.clear();
+                        }
+                        Ok(_) => self.lic_msg = "Ana bilgisayar için YÖNETİCİ kodu gerekir.".into(),
+                        Err(e) => self.lic_msg = e,
+                    }
+                }
+            });
+        });
     }
 
     pub fn ui_login(&mut self, ctx: &egui::Context) {
@@ -128,7 +194,7 @@ impl App {
                 self.brand_panel(&mut c);
             }
             let mut c = ui.new_child(egui::UiBuilder::new().max_rect(card_rect).layout(egui::Layout::top_down(egui::Align::Center)));
-            c.add_space((card_rect.height() * 0.5 - 230.0).max(20.0));
+            c.add_space((card_rect.height() * 0.60 - 120.0).max(20.0));
             if !wide {
                 if let Some(t) = self.logo_handle() {
                     let h = 80.0;
@@ -169,8 +235,17 @@ impl App {
     }
 
     fn login_card(&mut self, ui: &mut egui::Ui) {
-        let fill = card();
-        let fill = Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), 240);
+        // Giriş kartı seçili temadan bağımsızdır: arka plan resminin üzerinde her zaman koyu, yarı saydam kart.
+        let fill = Color32::from_rgba_unmultiplied(12, 22, 40, 226);
+        let (t_strong, muted) = (Color32::from_rgb(242, 245, 251), Color32::from_rgb(165, 177, 200));
+        {
+            let st = ui.style_mut();
+            st.visuals = egui::Visuals::dark();
+            st.visuals.override_text_color = Some(Color32::from_rgb(226, 231, 242));
+            st.visuals.extreme_bg_color = Color32::from_rgb(24, 33, 52);
+            st.visuals.widgets.inactive.bg_fill = Color32::from_rgb(58, 66, 84);
+            st.visuals.widgets.hovered.bg_fill = Color32::from_rgb(74, 84, 106);
+        }
         egui::Frame::new()
             .fill(fill)
             .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(212, 175, 55, 140)))
@@ -182,7 +257,7 @@ impl App {
               ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
                 if self.offline {
                     ui.colored_label(Color32::from_rgb(220, 70, 70), RichText::new(ti("Ana bilgisayara ulaşılamıyor.")).strong());
-                    ui.label(RichText::new(ti("Ana bilgisayarın açık ve programın çalışıyor olduğundan, aynı ağda olduğunuzdan emin olun.")).color(muted()));
+                    ui.label(RichText::new(ti("Ana bilgisayarın açık ve programın çalışıyor olduğundan, aynı ağda olduğunuzdan emin olun.")).color(muted));
                     ui.horizontal(|ui| {
                         if ui.button(ti("Yeniden dene")).clicked() {
                             self.ping();
@@ -192,13 +267,13 @@ impl App {
                         }
                     });
                     if !self.connect_msg.is_empty() {
-                        ui.label(RichText::new(&self.connect_msg).small().color(muted()));
+                        ui.label(RichText::new(&self.connect_msg).small().color(muted));
                     }
                 } else if self.needs_setup {
                     self.ui_first_setup(ui);
                 } else {
-                    ui.label(RichText::new(ti("Hoş geldiniz")).size(24.0).strong().color(t_strong()));
-                    ui.label(RichText::new(ti("Devam etmek için giriş yapın")).color(muted()));
+                    ui.label(RichText::new(ti("Hoş geldiniz")).size(24.0).strong().color(t_strong));
+                    ui.label(RichText::new(ti("Devam etmek için giriş yapın")).color(muted));
                     ui.add_space(10.0);
                     ui.label(RichText::new(ti("Kullanıcı adı")).strong());
                     let r1 = ui.add_sized([ui.available_width(), 32.0], egui::TextEdit::singleline(&mut self.l_user).margin(egui::vec2(8.0, 6.0)));
@@ -208,7 +283,15 @@ impl App {
                     if self.l_user.is_empty() && !r2.has_focus() {
                         r1.request_focus();
                     }
-                    let enter = (r1.lost_focus() || r2.lost_focus()) && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    let mut r3_enter = false;
+                    if self.need_code {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new(ti("Doğrulama kodu")).strong());
+                        let r3 = ui.add_sized([ui.available_width(), 32.0], egui::TextEdit::singleline(&mut self.l_code).hint_text(ti("123456 veya kurtarma kodu")).margin(egui::vec2(8.0, 6.0)));
+                        r3.request_focus();
+                        r3_enter = r3.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    }
+                    let enter = r3_enter || (r1.lost_focus() || r2.lost_focus()) && ui.input(|i| i.key_pressed(egui::Key::Enter));
                     ui.add_space(10.0);
                     if !self.connect_msg.is_empty() {
                         ui.colored_label(Color32::from_rgb(220, 70, 70), &self.connect_msg);

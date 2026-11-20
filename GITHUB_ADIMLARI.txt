@@ -1,0 +1,33 @@
+EMLAK OFİS — GITHUB'A YÜKLEME ADIMLARI (bir kez yapılır)
+=========================================================
+Depo: https://github.com/ibrahimcalli/EmlakOfix  (herkese açık)
+
+ÖNEMLİ: Depo herkese açık olduğu için müşteri verisi, şifre, imza anahtarı ve veritabanı ASLA yüklenmemelidir.
+Bu klasördeki .gitignore dosyası bunları otomatik dışarıda bırakır:
+  *.db, yedekler, ayarlar.json, *.gizli (imza anahtarı), .env, *.zip, *.exe, çevrimdışı haritalar, derleme çıktıları.
+
+1) git kurun
+   Linux Mint:  sudo apt install git
+   Windows:     https://git-scm.com/download/win
+
+2) GitHub'da "Personal access token" üretin (parola yerine kullanılır)
+   GitHub > sağ üst profil > Settings > Developer settings > Personal access tokens > Tokens (classic)
+   > Generate new token > "repo" kutusunu işaretleyin > süre seçin > oluşturun > çıkan metni KOPYALAYIN
+   (Bir daha gösterilmez. Kimseyle paylaşmayın, sohbetlere yapıştırmayın.)
+
+3) Bu klasörde (zip'ten çıkardığınız "kaynak" klasörü) komutu çalıştırın
+   Linux:    bash github_yukle.sh
+   Windows:  github_yukle.bat çift tıklayın
+   - Ad ve e-posta sorarsa yazın.
+   - Listede .db / .zip / .gizli görünmediğini kontrol edin, "e" yazın.
+   - Kullanıcı adı: ibrahimcalli   Parola: (2. adımdaki token)
+
+4) Sonraki güncellemelerde aynı komutu tekrar çalıştırmanız yeterlidir.
+
+5) Program (derlenmiş dosya) paylaşmak isterseniz kod deposuna değil, GitHub'da
+   Releases > "Draft a new release" bölümüne güncelleme zip'ini yükleyin.
+
+SORUN GİDERME
+- "Authentication failed": parola yerine token yazdığınızdan emin olun.
+- "rejected (non-fast-forward)": depoda sizde olmayan dosya var; önce  git pull --rebase origin main  yazın.
+- Yanlışlıkla gizli dosya yüklerseniz: anahtarı/şifreyi hemen DEĞİŞTİRİN (silmek yetmez, geçmişte kalır).

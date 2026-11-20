@@ -9,6 +9,7 @@ pub const SITE: &str = "https://emlakfethiye.com.tr";
 pub const PHONE: &str = "0090 532 402 1434";
 pub const MAIL: &str = "ibrahimcallifethiye@gmail.com";
 pub const APP_NAME_MOBILE: &str = "Gayrimenkul Portföyleri";
+#[allow(dead_code)]
 pub const PLAY_URL: &str = "https://play.google.com/store/search?q=Gayrimenkul%20Portf%C3%B6yleri&c=apps";
 
 impl App {
@@ -59,7 +60,7 @@ impl App {
         let soft = Color32::from_rgb(190, 202, 224);
         let gold = Color32::from_rgb(212, 175, 55);
         if let Some(t) = self.logo_handle() {
-            let h = 96.0;
+            let h = 110.0;
             let w = h * t.size_vec2().x / t.size_vec2().y;
             ui.image((t.id(), vec2(w, h)));
         }
@@ -97,8 +98,7 @@ impl App {
                 ui.set_max_width(400.0);
                 ui.label(RichText::new(format!("📱  {}", ti("Mobil uygulamamız"))).strong().color(gold));
                 ui.label(RichText::new(APP_NAME_MOBILE).size(18.0).strong().color(white));
-                ui.label(RichText::new(ti("Portföylerinize cebinizden de ulaşın. Android için Google Play'de.")).size(13.5).color(soft));
-                ui.hyperlink_to(RichText::new(ti("Google Play'de görüntüle")).size(14.0).color(gold), PLAY_URL);
+                ui.label(RichText::new(ti("Portföylerinize cebinizden de ulaşın. Android için Google Play'de yakında.")).size(13.5).color(soft));
             });
     }
 

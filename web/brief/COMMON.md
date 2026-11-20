@@ -1,0 +1,6 @@
+# Ortak kurallar (tüm ajanlar)
+Proje: /home/claude/restore/EmlakOfis/kaynak/web — sahibindenfethiye.com.tr Cloudflare Worker sitesi (JS ES modülleri, derleme YOK, npm paketi YOK, Node 22 ile yerelde `node --test`).
+ÖNCE OKU: SPEC.md (tamamı bağlayıcı), schema.sql, src/util.js, src/env.js, src/settings.js (SETTING_DEFS = tüm ayarlar), src/sanitize.js, src/index.js, src/testkit.js, test/shim.js.
+Sahibi programcı değil; her şey Türkçe, site TR/EN/RU. Yalnızca KENDİ dosyalarını yaz; başkasının dosyasına dokunma (gerekirse nihai raporda iste). Diğer modüller paralel yazılıyor ve şu an taslak olabilir (501 döner): test verisini doğrudan SQL ile (env.js all/first/run) kur.
+Önceki bir deneme limit hatasıyla yarıda kesildi: diskte kısmi dosyalar olabilir (src/i18n.js, src/auth.js). Kendi dosyalarının mevcut halini oku, kullanışlıysa devam et, değilse yeniden yaz.
+Test sözleşmesi: `src/<modül>_tests.js` `export const tests=[{module,name,run:async(env)=>{}}]` ; testkit.js (call, t, putListing, cleanup, TP, TEST_ID_MIN, listingPayload, JPEG_1PX) kullan; test verisi TP ön ekli / TEST_ID_MIN üstü id'li; ayar değiştiren test geri alır. node:test dosyası makeEnv() ile aynı diziyi koşturur. Çalıştır ve geçir. Dürüst rapor ≤250 kelime: dosyalar, export'lar, test sonucu, sapmalar. Çalıştırmadığını "çalıştı" deme. Limitlere takılmamak için dosyaları büyük ama az çağrıda yaz.

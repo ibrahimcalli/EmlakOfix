@@ -604,11 +604,7 @@ impl App {
                 }
             });
         }
-        if !p.description.trim().is_empty() {
-            ui.add_space(8.0);
-            ui.label(RichText::new(ti("Açıklama")).color(muted()).small());
-            ui.label(&p.description);
-        }
+
         ui.add_space(8.0);
         ui.label(
             RichText::new(format!("Ekleyen: {}  •  Kayıt: {}  •  Güncelleme: {}", p.creator_name, dt_tr(&p.created_at), dt_tr(&p.updated_at)))
@@ -663,6 +659,7 @@ impl App {
             });
             ui.add_space(8.0);
             self.listing_text_ui(ui, &p);
+            self.web_card_ui(ui, &p);
             self.detail_extras(ui);
         });
     }

@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS blobs(key TEXT PRIMARY KEY, data BLOB NOT NULL);
 
 const USER_COLS: &str = "id,username,first_name,last_name,phone,email,role,active,(photo IS NOT NULL)";
 const CREATOR_NAME: &str = "(SELECT CASE WHEN trim(u.first_name||u.last_name)='' THEN u.username ELSE trim(u.first_name||' '||u.last_name) END FROM users u WHERE u.id=p.creator_id)";
-const PCOLS: &str = "p.id,p.title,p.listing_type,p.category,p.district,p.neighborhood,p.address,p.lat,p.lon,p.price,p.currency,p.gross_m2,p.net_m2,p.rooms,p.building_age,p.floor,p.total_floors,p.heating,p.deed_status,p.furnished,p.swap_ok,p.credit_ok,p.description,p.status,p.crm_id,p.creator_id,p.created_at,p.updated_at,p.published_at,p.closed_at";
+const PCOLS: &str = "p.id,p.title,p.listing_type,p.category,p.district,p.neighborhood,p.address,p.lat,p.lon,p.price,p.currency,p.gross_m2,p.net_m2,p.rooms,p.building_age,p.floor,p.total_floors,p.heating,p.deed_status,p.furnished,p.swap_ok,p.credit_ok,p.description,p.status,p.crm_id,p.creator_id,p.created_at,p.updated_at,p.published_at,p.closed_at,p.description_en,p.description_ru";
 
 pub fn user_name_sql(col: &str) -> String {
     format!("(SELECT CASE WHEN trim(x.first_name||x.last_name)='' THEN x.username ELSE trim(x.first_name||' '||x.last_name) END FROM users x WHERE x.id={col})")
@@ -127,6 +127,7 @@ fn row_user(r: &Row) -> rusqlite::Result<UserInfo> {
         role: r.get(6)?,
         active: r.get::<_, i64>(7)? != 0,
         has_photo: r.get::<_, i64>(8)? != 0,
+        totp: false,
     })
 }
 
@@ -162,6 +163,8 @@ fn row_portfolio(r: &Row) -> rusqlite::Result<Portfolio> {
         updated_at: r.get(27)?,
         published_at: r.get(28)?,
         closed_at: r.get(29)?,
+        description_en: r.get(30)?,
+        description_ru: r.get(31)?,
         ..Default::default()
     })
 }
@@ -449,9 +452,16 @@ impl Db {
         Ok(Some(self.conn.last_insert_rowid()))
     }
 
+    pub fn set_contact_photo(&self, id: i64, data: Option<Vec<u8>>) -> R<()> {
+        self.conn.execute("UPDATE crm_contacts SET photo=?2 WHERE id=?1", params![id, data])?;
+        Ok(())
+    }
+    pub fn contact_photo(&self, id: i64) -> R<Option<Vec<u8>>> {
+        Ok(self.conn.query_row("SELECT photo FROM crm_contacts WHERE id=?1", params![id], |r| r.get::<_, Option<Vec<u8>>>(0)).optional()?.flatten())
+    }
     pub fn list_contacts(&self) -> R<Vec<CrmContact>> {
         let sql = format!(
-            "SELECT id,full_name,phone,email,note,created_at,{},consent,consent_date,anonymized FROM crm_contacts c ORDER BY created_at DESC, id DESC",
+            "SELECT id,full_name,phone,email,note,created_at,{},consent,consent_date,anonymized,(photo IS NOT NULL) FROM crm_contacts c ORDER BY created_at DESC, id DESC",
             user_name_sql("c.created_by")
         );
         let mut st = self.conn.prepare(&sql)?;
@@ -468,6 +478,7 @@ impl Db {
                 consent: r.get::<_, i64>(7)? != 0,
                 consent_date: r.get(8)?,
                 anonymized: r.get::<_, i64>(9)? != 0,
+                has_photo: r.get::<_, i64>(10)? != 0,
             })
         })?;
         let mut out: Vec<CrmContact> = rows.collect::<Result<Vec<_>, _>>()?;
@@ -581,6 +592,11 @@ impl Db {
             .ok_or_else(ApiErr::not_found)?;
         let mut st = self.conn.prepare("SELECT id FROM photos WHERE portfolio_id=?1 ORDER BY position,id")?;
         p.photos = st.query_map(params![id], |r| r.get(0))?.collect::<Result<Vec<i64>, _>>()?;
+        p.tags = crate::web::get_tags(self, id);
+        if let Ok((ws, wa)) = self.conn.query_row("SELECT web_status,web_at FROM portfolios WHERE id=?1", params![id], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))) {
+            p.web_status = ws;
+            p.web_at = wa;
+        }
         if me.is_admin() {
             if let Some(cid) = p.crm_id {
                 if let Some((n, ph, em, no)) = self
@@ -635,13 +651,13 @@ impl Db {
         let crm = self.upsert_contact(me.id, &p.owner_name, &p.owner_phone, &p.owner_email, &p.owner_note)?;
         let now = now_str();
         self.conn.execute(
-            "INSERT INTO portfolios(title,listing_type,category,district,neighborhood,address,lat,lon,price,currency,gross_m2,net_m2,rooms,building_age,floor,total_floors,heating,deed_status,furnished,swap_ok,credit_ok,description,status,crm_id,creator_id,created_at,updated_at,published_at,closed_at) \
-             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?26,?27,?28)",
+            "INSERT INTO portfolios(title,listing_type,category,district,neighborhood,address,lat,lon,price,currency,gross_m2,net_m2,rooms,building_age,floor,total_floors,heating,deed_status,furnished,swap_ok,credit_ok,description,status,crm_id,creator_id,created_at,updated_at,published_at,closed_at,description_en,description_ru) \
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?26,?27,?28,?29,?30)",
             params![
                 p.title.trim(), p.listing_type, p.category, p.district, p.neighborhood, p.address.trim(), p.lat, p.lon,
                 p.price, p.currency, p.gross_m2, p.net_m2, p.rooms, p.building_age.trim(), p.floor.trim(), p.total_floors.trim(),
                 p.heating, p.deed_status, p.furnished as i64, p.swap_ok as i64, p.credit_ok as i64, p.description.trim(),
-                status, crm, me.id, now, published, closed
+                status, crm, me.id, now, published, closed, p.description_en.trim(), p.description_ru.trim()
             ],
         )?;
         let id = self.conn.last_insert_rowid();
@@ -682,12 +698,12 @@ impl Db {
             }
         }
         self.conn.execute(
-            "UPDATE portfolios SET title=?2,listing_type=?3,category=?4,district=?5,neighborhood=?6,address=?7,lat=?8,lon=?9,price=?10,currency=?11,gross_m2=?12,net_m2=?13,rooms=?14,building_age=?15,floor=?16,total_floors=?17,heating=?18,deed_status=?19,furnished=?20,swap_ok=?21,credit_ok=?22,description=?23,status=?24,crm_id=?25,updated_at=?26,published_at=?27,closed_at=?28 WHERE id=?1",
+            "UPDATE portfolios SET title=?2,listing_type=?3,category=?4,district=?5,neighborhood=?6,address=?7,lat=?8,lon=?9,price=?10,currency=?11,gross_m2=?12,net_m2=?13,rooms=?14,building_age=?15,floor=?16,total_floors=?17,heating=?18,deed_status=?19,furnished=?20,swap_ok=?21,credit_ok=?22,description=?23,status=?24,crm_id=?25,updated_at=?26,published_at=?27,closed_at=?28,description_en=?29,description_ru=?30 WHERE id=?1",
             params![
                 id, p.title.trim(), p.listing_type, p.category, p.district, p.neighborhood, p.address.trim(), p.lat, p.lon,
                 p.price, p.currency, p.gross_m2, p.net_m2, p.rooms, p.building_age.trim(), p.floor.trim(), p.total_floors.trim(),
                 p.heating, p.deed_status, p.furnished as i64, p.swap_ok as i64, p.credit_ok as i64, p.description.trim(),
-                status, crm, now_str(), published, closed
+                status, crm, now_str(), published, closed, p.description_en.trim(), p.description_ru.trim()
             ],
         )?;
         if (old_price - p.price).abs() > 0.004 || old_cur != p.currency {
@@ -884,8 +900,8 @@ impl Db {
         }
         let uid: Option<i64> = if g.user_id > 0 { Some(g.user_id) } else { None };
         self.conn.execute(
-            "INSERT INTO goals(title,user_id,period_start,period_end,t_portfolio,t_published,t_rented,t_sold,note,created_by,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
-            params![g.title.trim(), uid, g.period_start, g.period_end, g.t_portfolio, g.t_published, g.t_rented, g.t_sold, g.note.trim(), me.id, now_str()],
+            "INSERT INTO goals(title,user_id,period_start,period_end,t_portfolio,t_published,t_rented,t_sold,note,created_by,created_at,t_web) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+            params![g.title.trim(), uid, g.period_start, g.period_end, g.t_portfolio, g.t_published, g.t_rented, g.t_sold, g.note.trim(), me.id, now_str(), g.t_web],
         )?;
         let msg = format!("Yeni hedef: {} ({} – {})", g.title.trim(), g.period_start, g.period_end);
         match uid {
@@ -911,7 +927,7 @@ impl Db {
     }
     pub fn list_goals(&self, me: &UserInfo) -> R<Vec<GoalInfo>> {
         let sql = format!(
-            "SELECT id,title,COALESCE(user_id,0),{},period_start,period_end,t_portfolio,t_published,t_rented,t_sold,note FROM goals g {} ORDER BY period_end DESC, id DESC",
+            "SELECT id,title,COALESCE(user_id,0),{},period_start,period_end,t_portfolio,t_published,t_rented,t_sold,note,COALESCE(t_web,0) FROM goals g {} ORDER BY period_end DESC, id DESC",
             user_name_sql("g.user_id"),
             if me.is_lead() { "" } else { "WHERE (g.user_id IS NULL OR g.user_id=?1)" }
         );
@@ -929,6 +945,7 @@ impl Db {
                 t_rented: r.get(8)?,
                 t_sold: r.get(9)?,
                 note: r.get(10)?,
+                t_web: r.get(11)?,
                 ..Default::default()
             })
         };
@@ -943,6 +960,7 @@ impl Db {
             g.p_portfolio = self.count("SELECT COUNT(*) FROM portfolios WHERE status<>'Taslak' AND substr(created_at,1,10) BETWEEN ?1 AND ?2", &s, &e, uid)?;
             g.p_published = self.count("SELECT COUNT(*) FROM portfolios WHERE published_at<>'' AND substr(published_at,1,10) BETWEEN ?1 AND ?2", &s, &e, uid)?;
             g.p_rented = self.count("SELECT COUNT(*) FROM portfolios WHERE status='Kiralandı' AND substr(closed_at,1,10) BETWEEN ?1 AND ?2", &s, &e, uid)?;
+            g.p_web = self.count("SELECT COUNT(*) FROM portfolios WHERE web_status='Yayında' AND web_at<>'' AND substr(web_at,1,10) BETWEEN ?1 AND ?2", &s, &e, uid)?;
             g.p_sold = self.count("SELECT COUNT(*) FROM portfolios WHERE status='Satıldı' AND substr(closed_at,1,10) BETWEEN ?1 AND ?2", &s, &e, uid)?;
         }
         Ok(goals)
@@ -987,10 +1005,16 @@ impl Db {
         if let Err(e) = self.copy_external(&target) {
             eprintln!("Harici yedek hatası: {e}");
         }
-        // en yeni 30 yedeği tut
+        if let Err(e) = self.copy_safe(&target) {
+            eprintln!("Güvenli yerel yedek hatası: {e}");
+        }
+        if let Err(e) = self.rclone_sync(&target) {
+            eprintln!("Bulut (rclone) yedek hatası: {e}");
+        }
+        // en yeni N yedeği tut (Ayarlar > Yedekleme)
         let mut files = self.list_backups();
         files.sort();
-        while files.len() > 30 {
+        while files.len() > self.backup_keep() {
             let old = files.remove(0);
             let _ = std::fs::remove_file(dir.join(old));
         }

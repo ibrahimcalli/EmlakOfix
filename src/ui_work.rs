@@ -396,7 +396,7 @@ impl App {
                     }
                 });
                 ui.end_row();
-                for (i, name) in ["Portföy kaydı (adet)", "Yayına alma (adet)", "Kiralama (adet)", "Satış (adet)"].iter().enumerate() {
+                for (i, name) in ["Portföy kaydı (adet)", "Yayına alma (adet)", "Kiralama (adet)", "Satış (adet)", "Web sitesinde yayına alınan ilan (adet, yönetici onaylı)"].iter().enumerate() {
                     ui.label(*name);
                     ui.add(egui::DragValue::new(&mut self.gform.t[i]).range(0..=1000));
                     ui.end_row();
@@ -417,10 +417,11 @@ impl App {
                         t_published: self.gform.t[1],
                         t_rented: self.gform.t[2],
                         t_sold: self.gform.t[3],
+                        t_web: self.gform.t[4],
                         note: self.gform.note.trim().to_string(),
                         ..Default::default()
                     };
-                    if g.t_portfolio + g.t_published + g.t_rented + g.t_sold == 0 {
+                    if g.t_portfolio + g.t_published + g.t_rented + g.t_sold + g.t_web == 0 {
                         self.err(ti("En az bir hedef kalemi girin."));
                     } else {
                         self.call(move |api| api.post("/api/goals", &g), |app, _| {
@@ -456,7 +457,7 @@ impl App {
         let mut delete: Option<i64> = None;
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for g in &goals {
-                let items = [("Portföy kaydı", g.p_portfolio, g.t_portfolio), ("Yayına alma", g.p_published, g.t_published), ("Kiralama", g.p_rented, g.t_rented), ("Satış", g.p_sold, g.t_sold)];
+                let items = [("Portföy kaydı", g.p_portfolio, g.t_portfolio), ("Yayına alma", g.p_published, g.t_published), ("Kiralama", g.p_rented, g.t_rented), ("Satış", g.p_sold, g.t_sold), ("Web yayını", g.p_web, g.t_web)];
                 let active: Vec<_> = items.iter().filter(|i| i.2 > 0).collect();
                 let pct = if active.is_empty() { 0.0 } else { active.iter().map(|i| (i.1 as f32 / i.2 as f32).min(1.0)).sum::<f32>() / active.len() as f32 };
                 let running = g.period_start <= today && today <= g.period_end;
