@@ -14,7 +14,7 @@ run_worker_first = true
 binding = "DB"
 database_name = "sahibindenfethiye"
 # Cloudflare panelinde veritabanını oluşturunca gösterilen kimliği buraya yapıştırın:
-database_id = "BURAYA-D1-KIMLIGI"
+database_id = "5b54d720-8aae-4156-94ed-7257397a7990"
 
 [[r2_buckets]]
 binding = "MEDIA"
