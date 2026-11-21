@@ -13,12 +13,18 @@ run_worker_first = true
 [[d1_databases]]
 binding = "DB"
 database_name = "sahibindenfethiye"
-# Cloudflare panelinde veritabanını oluşturunca gösterilen kimliği buraya yapıştırın:
 database_id = "5b54d720-8aae-4156-94ed-7257397a7990"
 
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "sahibindenfethiye-medya"
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
 
 [vars]
 SITE_URL = "https://sahibindenfethiye.com.tr"
