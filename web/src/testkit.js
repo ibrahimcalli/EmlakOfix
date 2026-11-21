@@ -25,8 +25,8 @@ export const jsonInit = (method, obj, headers = {}) => ({ method, headers: { 'co
 export const textOf = async (res) => await res.text();
 export const jsonOf = async (res) => await res.json();
 
-let seq = 0;
-export const testId = () => TEST_ID_MIN + 1000 + (seq++ % 5000);
+let seq = Math.floor(Math.random() * 80000); // her Worker cagrisi farkli aralikta baslar (carpisma olmasin)
+export const testId = () => TEST_ID_MIN + 1000 + (seq++ % 90000);
 export function listingPayload(over = {}) {
   const id = over.id || testId();
   return { id, title: `${TP} Satılık Deniz Manzaralı Villa ${id}`, title_en: `${TP} Villa for sale ${id}`, title_ru: `${TP} Вилла ${id}`, listing_type: 'Satılık', category: 'Villa', district: 'Fethiye', neighborhood: 'Çalış', address: 'Test sokak', lat: 36.65, lon: 29.12, price: 12500000, currency: 'TRY', gross_m2: 220, net_m2: 180, rooms: '4+1', building_age: '2', floor: 'Müstakil', total_floors: '2', heating: 'Klima', deed_status: 'Kat mülkiyeti', furnished: 1, swap_ok: 0, credit_ok: 1, desc_tr: `${TP} Türkçe açıklama <script>alert(1)</script>`, desc_en: `${TP} English description`, desc_ru: `${TP} Русское описание`, tags: ['Villa', 'Fırsat'], photo_count: 0, agent_name: 'Test Danışman', agent_phone: '+905550000000', prog_status: 'Yayında', published_at: new Date().toISOString(), ...over };

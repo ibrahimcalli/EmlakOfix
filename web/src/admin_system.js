@@ -206,11 +206,20 @@ async function activity(ctx) {
 
 // ------------------------------------------------------------------ Testler
 async function testsPage(ctx, parts) {
-  const { runAll, listModules } = await import('./tests.js');
+  const { runAll, listModules, listTests, runOne, startRun, endRun } = await import('./tests.js');
   if (ctx.method === 'POST' && parts[1] === 'calistir') {
     const module = ctx.s('module');
     const rep = await runAll(ctx.env, module ? { module } : {});
     await logActivity(ctx.env, ctx.who, `Testler çalıştırıldı${module ? ` (${module})` : ''}: ${rep.passed} geçti, ${rep.failed} başarısız`);
+    return secured(jsonResponse({ ok: true, report: rep }));
+  }
+  if (parts[1] === 'liste') return secured(jsonResponse({ ok: true, tests: await listTests(ctx.url.searchParams.get('module') || '') }));
+  if (ctx.method === 'POST' && parts[1] === 'baslat') { await startRun(ctx.env); return secured(jsonResponse({ ok: true })); }
+  if (ctx.method === 'POST' && parts[1] === 'tek') return secured(jsonResponse({ ok: true, result: await runOne(ctx.env, Number(ctx.s('i'))) }));
+  if (ctx.method === 'POST' && parts[1] === 'bitir') {
+    let results = []; try { results = JSON.parse(ctx.s('results') || '[]'); } catch { /* bos */ }
+    const rep = await endRun(ctx.env, results, ctx.s('module'), Number(ctx.s('ms')));
+    await logActivity(ctx.env, ctx.who, `Testler çalıştırıldı${ctx.s('module') ? ` (${ctx.s('module')})` : ''}: ${rep.passed} geçti, ${rep.failed} başarısız`);
     return secured(jsonResponse({ ok: true, report: rep }));
   }
   if (parts[1] === 'rapor') {

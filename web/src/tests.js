@@ -52,3 +52,27 @@ export async function runAll(env, { module } = {}) {
   return rep;
 }
 export async function lastRuns(env, n = 10) { return await all(env, 'SELECT id,at,passed,failed,report FROM test_runs ORDER BY id DESC LIMIT ?', n); }
+
+// ---- Tek tek calistirma (Cloudflare: her test KENDI Worker cagrisinda calisir; istek basina sorgu sinirina takilmaz)
+export async function listTests(module) {
+  return (await loadAll()).map((t, i) => ({ i, module: t.module, name: t.name })).filter((x) => !module || x.module === module);
+}
+export async function startRun(env) { await cleanup(env); }
+export async function runOne(env, i) {
+  const tc = (await loadAll())[i];
+  if (!tc) return { module: '?', name: `#${i}`, ok: false, ms: 0, error: 'Test bulunamadı' };
+  const snap = await snapshotSettings(env);
+  const t0 = Date.now();
+  try { await withTimeout(Promise.resolve(tc.run(env)), 25000); return { module: tc.module, name: tc.name, ok: true, ms: Date.now() - t0, error: '' }; }
+  catch (e) { return { module: tc.module, name: tc.name, ok: false, ms: Date.now() - t0, error: String(e && e.message || e).slice(0, 400) }; }
+  finally { try { await restoreSettings(env, snap); } catch { /* yoksay */ } }
+}
+export async function endRun(env, results, module, ms) {
+  try { await cleanup(env); } catch { /* yoksay */ }
+  const list = (Array.isArray(results) ? results : []).slice(0, 500).map((r) => ({ module: String(r.module || '').slice(0, 60), name: String(r.name || '').slice(0, 160), ok: !!r.ok, ms: Number(r.ms) || 0, error: String(r.error || '').slice(0, 400) }));
+  const passed = list.filter((r) => r.ok).length;
+  const rep = { at: new Date().toISOString(), passed, failed: list.length - passed, ms: Number(ms) || 0, results: list };
+  await run(env, 'INSERT INTO test_runs(at,passed,failed,report) VALUES(?,?,?,?)', rep.at, rep.passed, rep.failed, JSON.stringify({ module: module || '', ms: rep.ms, results: list }));
+  await run(env, 'DELETE FROM test_runs WHERE id NOT IN (SELECT id FROM test_runs ORDER BY id DESC LIMIT 30)');
+  return rep;
+}
