@@ -71,21 +71,62 @@
     wrap.appendChild(tb); wrap.appendChild(body); wrap.appendChild(src); ta.style.display = 'none'; ta.parentNode.insertBefore(wrap, ta.nextSibling);
     body.addEventListener('input', sync);
   });
-  // testler
+  // testler: her test ayri istekte calisir (Cloudflare istek basina sorgu siniri), canli ilerleme, kopyala
   var out = $('#testout');
-  if (out) $$('[data-run]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var mod = b.getAttribute('data-run'); $$('[data-run]').forEach(function (x) { x.disabled = true; });
-      out.innerHTML = '<p>⏳ Testler çalışıyor… (birkaç saniye sürebilir)</p>';
-      var fd = new URLSearchParams(); if (mod) fd.set('module', mod);
-      fetch('/admin/testler/calistir', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': csrf, 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd.toString() }).then(function (r) { return r.json(); }).then(function (j) {
-        $$('[data-run]').forEach(function (x) { x.disabled = false; });
-        if (!j.ok) { out.textContent = j.error || 'Hata'; return; }
-        var r = j.report, esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-        var h = '<p class="testsum ' + (r.failed ? 'fail' : 'pass') + '">' + (r.failed ? '✗ ' + r.failed + ' başarısız, ' : '✓ ') + r.passed + ' geçti — ' + r.results.length + ' test, ' + (r.ms / 1000).toFixed(1) + ' sn</p><table><thead><tr><th>Modül</th><th>Test</th><th></th><th>Süre</th><th>Hata</th></tr></thead><tbody>';
-        r.results.slice().sort(function (a, b) { return (a.ok === b.ok) ? 0 : a.ok ? 1 : -1; }).forEach(function (t) { h += '<tr><td>' + esc(t.module) + '</td><td>' + esc(t.name) + '</td><td class="' + (t.ok ? 'pass' : 'fail') + '">' + (t.ok ? '✓' : '✗') + '</td><td>' + t.ms + ' ms</td><td>' + esc(t.error || '') + '</td></tr>'; });
-        out.innerHTML = h + '</tbody></table>';
-      }).catch(function (e) { $$('[data-run]').forEach(function (x) { x.disabled = false; }); out.textContent = 'İstek başarısız: ' + e; });
+  if (out) {
+    var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var post = function (path, params) {
+      return fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': csrf, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params || {}).toString() }).then(function (r) { return r.json(); });
+    };
+    var copyText = function (txt, btn) {
+      var done = function () { var o = btn.textContent; btn.textContent = '✓ Kopyalandı'; setTimeout(function () { btn.textContent = o; }, 1800); };
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(done, function () { fallback(); }); else fallback();
+      function fallback() { var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { prompt('Kopyalayın (Ctrl+C):', txt); } document.body.removeChild(ta); }
+    };
+    var asText = function (res, ms, onlyFail) {
+      var failed = res.filter(function (r) { return !r.ok; }).length;
+      var t = (failed ? '✗ ' + failed + ' başarısız, ' : '✓ ') + (res.length - failed) + ' geçti — ' + res.length + ' test, ' + (ms / 1000).toFixed(1) + ' sn\nModül\tTest\t\tSüre\tHata\n';
+      res.slice().sort(function (a, b) { return a.ok === b.ok ? 0 : a.ok ? 1 : -1; }).forEach(function (r) { if (onlyFail && r.ok) return; t += r.module + '\t' + r.name + '\t' + (r.ok ? '✓' : '✗') + '\t' + r.ms + ' ms\t' + (r.error || '') + '\n'; });
+      return t;
+    };
+    var render = function (res, ms, finished, total) {
+      var failed = res.filter(function (r) { return !r.ok; }).length;
+      var h = '<p class="testsum ' + (failed ? 'fail' : 'pass') + '">' + (finished ? '' : '⏳ ' + res.length + ' / ' + total + ' — ') + (failed ? '✗ ' + failed + ' başarısız, ' : '✓ ') + (res.length - failed) + ' geçti' + (finished ? ' — ' + res.length + ' test, ' + (ms / 1000).toFixed(1) + ' sn' : '') + '</p>';
+      if (!finished) h += '<progress max="' + total + '" value="' + res.length + '" style="width:100%"></progress>';
+      else h += '<p class="row"><button class="btn" id="cp-all" type="button">📋 Sonucu kopyala</button><button class="btn" id="cp-fail" type="button">📋 Yalnız başarısızları kopyala</button></p>';
+      h += '<table><thead><tr><th>Modül</th><th>Test</th><th></th><th>Süre</th><th>Hata</th></tr></thead><tbody>';
+      res.slice().sort(function (a, b) { return a.ok === b.ok ? 0 : a.ok ? 1 : -1; }).forEach(function (t) { h += '<tr><td>' + esc(t.module) + '</td><td>' + esc(t.name) + '</td><td class="' + (t.ok ? 'pass' : 'fail') + '">' + (t.ok ? '✓' : '✗') + '</td><td>' + t.ms + ' ms</td><td>' + esc(t.error || '') + '</td></tr>'; });
+      out.innerHTML = h + '</tbody></table>';
+      if (finished) {
+        var a = $('#cp-all'), f = $('#cp-fail');
+        if (a) a.addEventListener('click', function () { copyText(asText(res, ms, false), a); });
+        if (f) f.addEventListener('click', function () { copyText(asText(res, ms, true), f); });
+      }
+    };
+    var running = false;
+    $$('[data-run]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (running) return; running = true;
+        var mod = b.getAttribute('data-run'); $$('[data-run]').forEach(function (x) { x.disabled = true; });
+        var t0 = Date.now(), res = [];
+        var finish = function (msg) { running = false; $$('[data-run]').forEach(function (x) { x.disabled = false; }); if (msg) out.innerHTML = '<p class="fail">' + esc(msg) + '</p>'; };
+        out.innerHTML = '<p>⏳ Hazırlanıyor…</p>';
+        post('/admin/testler/baslat').then(function (j) {
+          if (!j.ok) throw new Error(j.error || 'Başlatılamadı');
+          return fetch('/admin/testler/liste' + (mod ? '?module=' + encodeURIComponent(mod) : ''), { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }).then(function (r) { return r.json(); });
+        }).then(function (l) {
+          var list = l.tests || [], k = 0;
+          var step = function () {
+            if (k >= list.length) {
+              var ms = Date.now() - t0;
+              return post('/admin/testler/bitir', { module: mod, ms: ms, results: JSON.stringify(res) }).catch(function () { return null; }).then(function () { render(res, ms, true, list.length); finish(); });
+            }
+            var it = list[k++];
+            return post('/admin/testler/tek', { i: it.i }).then(function (j) { res.push(j.result || { module: it.module, name: it.name, ok: false, ms: 0, error: j.error || 'Yanıt yok' }); }, function (e) { res.push({ module: it.module, name: it.name, ok: false, ms: 0, error: 'İstek başarısız: ' + e }); }).then(function () { if (k % 3 === 0 || k === list.length) render(res, 0, false, list.length); return step(); });
+          };
+          return step();
+        }).catch(function (e) { finish('Hata: ' + e); });
+      });
     });
-  });
+  }
 })();
