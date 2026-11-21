@@ -71,6 +71,7 @@ export const SETTING_DEFS = [
   { key: 'sidebar_on_listings', group: 'Kenar çubuğu', label: 'İlan sayfalarında kenar çubuğu', type: 'bool', def: '1' },
   { key: 'sidebar_on_blog', group: 'Kenar çubuğu', label: 'Blog sayfalarında kenar çubuğu', type: 'bool', def: '1' },
   // ---- İlan
+  { key: 'map_default', group: 'İlan', label: 'İlan haritası varsayılan altlık (uydu / sokak)', type: 'select', options: ['uydu', 'sokak'], def: 'uydu' },
   { key: 'hide_exact_location', group: 'İlan', label: 'Tam konumu gizle (yaklaşık daire)', type: 'bool', def: '1' },
   { key: 'fx_show', group: 'İlan', label: 'Döviz karşılığı göster', type: 'bool', def: '0' },
   { key: 'fx_rate_eur', group: 'İlan', label: '1 € kaç ₺', type: 'number', def: '0' },

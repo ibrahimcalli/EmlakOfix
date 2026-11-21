@@ -35,7 +35,7 @@ const D = {
     blog_all: 'Tüm yazılar', blog_empty: 'Henüz yazı yok.', read_more: 'Devamını oku', related: 'İlgili Yazılar', by: 'Yazar', latest_posts: 'Son Yazılar', in_cat: '{0} kategorisindeki yazılar',
     notfound_title: 'Sayfa bulunamadı', notfound_text: 'Aradığınız sayfa taşınmış veya kaldırılmış olabilir.', back_home: 'Ana sayfaya dön', browse_listings: 'İlanlara göz atın',
     maintenance: 'Bakım Çalışması', other_listings: 'Diğer İlanlar', all_listings: 'Tüm İlanlar', see_all: 'Tümünü gör',
-    breadcrumb: 'Gezinti', slide_prev: 'Önceki', slide_next: 'Sonraki', slide_n: 'Slayt {0}', rights: 'Tüm hakları saklıdır.', followus: 'Bizi takip edin',
+    map_street: 'Sokak', map_satellite: 'Uydu', breadcrumb: 'Gezinti', slide_prev: 'Önceki', slide_next: 'Sonraki', slide_n: 'Slayt {0}', rights: 'Tüm hakları saklıdır.', followus: 'Bizi takip edin',
     hero_cta: 'İlanları incele', hero_cta2: 'Bize ulaşın', views: 'Görüntülenme',
   },
   en: {
@@ -65,7 +65,7 @@ const D = {
     blog_all: 'All posts', blog_empty: 'No posts yet.', read_more: 'Read more', related: 'Related Posts', by: 'By', latest_posts: 'Latest Posts', in_cat: 'Posts in {0}',
     notfound_title: 'Page not found', notfound_text: 'The page you are looking for may have been moved or removed.', back_home: 'Back to home', browse_listings: 'Browse listings',
     maintenance: 'Under Maintenance', other_listings: 'Other Listings', all_listings: 'All Listings', see_all: 'See all',
-    breadcrumb: 'Breadcrumb', slide_prev: 'Previous', slide_next: 'Next', slide_n: 'Slide {0}', rights: 'All rights reserved.', followus: 'Follow us',
+    map_street: 'Street', map_satellite: 'Satellite', breadcrumb: 'Breadcrumb', slide_prev: 'Previous', slide_next: 'Next', slide_n: 'Slide {0}', rights: 'All rights reserved.', followus: 'Follow us',
     hero_cta: 'Browse listings', hero_cta2: 'Contact us', views: 'Views',
   },
   ru: {
@@ -95,7 +95,7 @@ const D = {
     blog_all: 'Все статьи', blog_empty: 'Статей пока нет.', read_more: 'Читать далее', related: 'Похожие статьи', by: 'Автор', latest_posts: 'Последние статьи', in_cat: 'Статьи в категории {0}',
     notfound_title: 'Страница не найдена', notfound_text: 'Возможно, страница была перемещена или удалена.', back_home: 'На главную', browse_listings: 'Смотреть объекты',
     maintenance: 'Технические работы', other_listings: 'Другие объекты', all_listings: 'Все объекты', see_all: 'Показать все',
-    breadcrumb: 'Навигация', slide_prev: 'Назад', slide_next: 'Вперёд', slide_n: 'Слайд {0}', rights: 'Все права защищены.', followus: 'Мы в соцсетях',
+    map_street: 'Улицы', map_satellite: 'Спутник', breadcrumb: 'Навигация', slide_prev: 'Назад', slide_next: 'Вперёд', slide_n: 'Слайд {0}', rights: 'Все права защищены.', followus: 'Мы в соцсетях',
     hero_cta: 'Смотреть объекты', hero_cta2: 'Связаться', views: 'Просмотры',
   },
 };

@@ -133,7 +133,11 @@
       var js = d.createElement('script'); js.src = map.getAttribute('data-js'); js.onload = function () {
         var lat = parseFloat(map.getAttribute('data-lat')), lon = parseFloat(map.getAttribute('data-lon')), approx = map.getAttribute('data-approx') === '1';
         var m = window.L.map(map, { scrollWheelZoom: false }).setView([lat, lon], approx ? 14 : 15);
-        window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(m);
+        var street = window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
+        var sat = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics' });
+        var base = {}; base[map.getAttribute('data-lbl-sat') || 'Uydu'] = sat; base[map.getAttribute('data-lbl-street') || 'Sokak'] = street;
+        (map.getAttribute('data-base') === 'sokak' ? street : sat).addTo(m);
+        window.L.control.layers(base, null, { collapsed: false }).addTo(m);
         if (approx) window.L.circle([lat, lon], { radius: parseInt(map.getAttribute('data-radius'), 10) || 300, color: '#d4af37', fillOpacity: .2 }).addTo(m);
         else window.L.marker([lat, lon]).addTo(m);
       };

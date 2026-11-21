@@ -182,3 +182,5 @@ textarea{min-height:120px;resize:vertical}
 /* duzeltme: masaustunde logo + menu + dil tek satir */
 @media (min-width:981px){.hdr-row{flex-wrap:nowrap;gap:.8rem}.nav{flex:1;min-width:0}.menu{justify-content:flex-end}.menu a{padding:.5rem .55rem;font-size:.76rem}.logo img{height:52px;width:auto}.langs{order:9;margin-left:.4rem}}
 @media (min-width:981px) and (max-width:1500px){.hdr-phone{display:none}}
+
+.crumbs ol,.crumbs ul{list-style:none;margin:0;padding:0}.crumbs li{list-style:none}
