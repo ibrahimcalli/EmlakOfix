@@ -63,6 +63,13 @@ export async function cleanup(env) {
 }
 export async function snapshotSettings(env) { return await all(env, 'SELECT key,value FROM settings'); }
 export async function restoreSettings(env, snap) {
-  await run(env, 'DELETE FROM settings');
-  for (const r of snap) await run(env, 'INSERT INTO settings(key,value) VALUES(?,?)', r.key, r.value);
+  // Yalnizca FARKLARI uygula (D1 ucretsiz plan: gunluk 100.000 satir yazma siniri; her testte tabloyu silip yeniden yazmak bu siniri doldurur)
+  const now = await all(env, 'SELECT key,value FROM settings');
+  const before = new Map(snap.map((r) => [r.key, r.value]));
+  const after = new Map(now.map((r) => [r.key, r.value]));
+  for (const [k] of after) if (!before.has(k)) await run(env, 'DELETE FROM settings WHERE key=?', k);
+  for (const [k, v] of before) {
+    if (!after.has(k)) await run(env, 'INSERT INTO settings(key,value) VALUES(?,?)', k, v);
+    else if (after.get(k) !== v) await run(env, 'UPDATE settings SET value=? WHERE key=?', v, k);
+  }
 }

@@ -3,6 +3,7 @@ import { all, first, run, scalar } from './env.js';
 import {
   esc, html, raw, safeUrl, fmtInt, fmtDate, parseJson, toInt, toNum, truthy, stripTags, truncate, clamp,
   htmlResponse, textResponse, redirect, cookie, parseCookies, nowIso,
+  likePattern,
 } from './util.js';
 import { getSettings, sBool, sInt, sJson } from './settings.js';
 import { sanitizeHtml } from './sanitize.js';
@@ -161,7 +162,7 @@ async function queryListings(env, pc, f, base = {}) {
   if (f.max) { w.push('l.price<=?'); a.push(f.max); }
   if (f.tag) { w.push("l.tags LIKE ? ESCAPE '\\'"); a.push(`%${likeEsc(JSON.stringify(f.tag))}%`); }
   if (f.q) {
-    const like = `%${likeEsc(f.q)}%`;
+    const like = likePattern(f.q);
     const cols = ['l.title', 'l.title_en', 'l.title_ru', 'l.district', 'l.neighborhood', 'l.category', 'l.address', 'l.desc_tr', 'l.slug'];
     w.push(`(${cols.map((c) => `${c} LIKE ? ESCAPE '\\'`).join(' OR ')} OR CAST(l.id AS TEXT)=?)`);
     a.push(...cols.map(() => like), f.q);
@@ -326,7 +327,7 @@ async function searchPage(request, env, url, pc) {
   const { ch, tagMap } = await listingPageCommon(env, pc, f);
   let posts = [];
   if (f.q) {
-    const like = `%${likeEsc(f.q)}%`;
+    const like = likePattern(f.q);
     posts = await all(env, "SELECT * FROM posts WHERE status='yayinda' AND (title LIKE ? ESCAPE '\\' OR title_en LIKE ? ESCAPE '\\' OR title_ru LIKE ? ESCAPE '\\' OR excerpt LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\') ORDER BY published_at DESC LIMIT 6", like, like, like, like, like);
   }
   const cats = new Map((await all(env, 'SELECT * FROM blog_categories')).map((c) => [c.id, c]));

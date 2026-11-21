@@ -1,4 +1,5 @@
 // Yonetim paneli ortak arayuz parcalari: sayfa kabugu, form alanlari, sayfalama, govde okuma, gorsel yukleme.
+import { likePattern } from './util.js';
 import { html, raw, esc, redirect, htmlResponse, jsonResponse, cookie, parseCookies, parseJson, randomHexSafe } from './admin_util.js';
 import { FLASH_COOKIE } from './auth.js';
 
@@ -174,6 +175,6 @@ export function paging(url, total, per = 25) {
   const page = Math.min(pages, Math.max(1, parseInt(url.searchParams.get('sayfa') || '1', 10) || 1));
   return { page, pages, per, offset: (page - 1) * per };
 }
-export const likeArg = (q) => '%' + String(q).replace(/[\\%_]/g, '\\$&') + '%';
+export const likeArg = (q) => likePattern(q);
 export const ESC_LIKE = "ESCAPE '\\'";
 export const dt = (iso) => (iso ? String(iso).replace('T', ' ').slice(0, 16) : '');

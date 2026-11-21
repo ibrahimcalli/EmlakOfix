@@ -146,3 +146,16 @@ export function redirect(location, status = 302, cookies = []) {
   for (const c of cookies) h.append('set-cookie', c);
   return new Response(null, { status, headers: h });
 }
+
+// D1 (Cloudflare) LIKE desen siniri ~50 bayt: daha uzun desen "LIKE or GLOB pattern too complex" hatasi verir.
+// Aranan metni kacisla; desen (%..%) en fazla 46 bayt olacak sekilde kisaltir.
+export function likePattern(q, maxBytes = 46) {
+  const enc = new TextEncoder();
+  let out = '';
+  for (const ch of String(q)) {
+    const piece = /[\\%_]/.test(ch) ? '\\' + ch : ch;
+    if (enc.encode('%' + out + piece + '%').length > maxBytes) break;
+    out += piece;
+  }
+  return '%' + out + '%';
+}

@@ -76,7 +76,7 @@
   if (out) {
     var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     var post = function (path, params) {
-      return fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': csrf, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params || {}).toString() }).then(function (r) { return r.json(); });
+      return fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': csrf, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params || {}).toString() }).then(function (r) { return r.text().then(function (txt) { try { return JSON.parse(txt); } catch (e) { var m = /<title>([^<]*)<\/title>/i.exec(txt); throw new Error('HTTP ' + r.status + ' — JSON yerine sayfa döndü' + (m ? ': ' + m[1].trim() : (r.redirected ? ' (yönlendirildi: ' + r.url + ')' : ''))); } }); });
     };
     var copyText = function (txt, btn) {
       var done = function () { var o = btn.textContent; btn.textContent = '✓ Kopyalandı'; setTimeout(function () { btn.textContent = o; }, 1800); };
