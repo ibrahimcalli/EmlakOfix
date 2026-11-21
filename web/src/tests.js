@@ -4,13 +4,12 @@ import { cleanup, snapshotSettings, restoreSettings } from './testkit.js';
 
 const SOURCES = [
   ['core_tests.js', 'Çekirdek'], ['sync_tests.js', 'Program senkronu'], ['public_tests.js', 'Genel site'],
-  ['admin_tests.js', 'Yönetim paneli'], ['admin_listings_tests.js', 'Yönetim paneli'], ['admin_content_tests.js', 'Yönetim paneli'], ['admin_system_tests.js', 'Yönetim paneli'],
+  ['admin_tests.js', 'Yönetim paneli'],
 ];
-// Dinamik import: dosya yoksa/yuklenemezse bu bir "yuklenemedi" testi olarak raporlanir (Cloudflare'de statik import listesi gerekir).
+// Dinamik import: yuklenemezse bir "yuklenemedi" testi olarak raporlanir. Yalnizca VAR OLAN dosyalar listelenmeli (bundler olmayani cozemez).
 const LOADERS = {
   'core_tests.js': () => import('./core_tests.js'), 'sync_tests.js': () => import('./sync_tests.js'), 'public_tests.js': () => import('./public_tests.js'),
-  'admin_tests.js': () => import('./admin_tests.js'), 'admin_listings_tests.js': () => import('./admin_listings_tests.js'),
-  'admin_content_tests.js': () => import('./admin_content_tests.js'), 'admin_system_tests.js': () => import('./admin_system_tests.js'),
+  'admin_tests.js': () => import('./admin_tests.js'),
 };
 async function loadAll() {
   const out = [];
