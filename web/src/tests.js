@@ -4,12 +4,12 @@ import { cleanup, snapshotSettings, restoreSettings } from './testkit.js';
 
 const SOURCES = [
   ['core_tests.js', 'Çekirdek'], ['sync_tests.js', 'Program senkronu'], ['public_tests.js', 'Genel site'],
-  ['admin_tests.js', 'Yönetim paneli'],
+  ['admin_tests.js', 'Yönetim paneli'], ['import_tests.js', 'Yazı içe aktarma'],
 ];
 // Dinamik import: yuklenemezse bir "yuklenemedi" testi olarak raporlanir. Yalnizca VAR OLAN dosyalar listelenmeli (bundler olmayani cozemez).
 const LOADERS = {
   'core_tests.js': () => import('./core_tests.js'), 'sync_tests.js': () => import('./sync_tests.js'), 'public_tests.js': () => import('./public_tests.js'),
-  'admin_tests.js': () => import('./admin_tests.js'),
+  'admin_tests.js': () => import('./admin_tests.js'), 'import_tests.js': () => import('./import_tests.js'),
 };
 async function loadAll() {
   const out = [];
@@ -17,7 +17,7 @@ async function loadAll() {
     try { const m = await LOADERS[file](); for (const t of m.tests || []) out.push({ module: t.module || label, name: t.name, run: t.run }); }
     catch (e) {
       const msg = String(e && e.message || e);
-      if (/Cannot find module|Failed to load url|not found|No such module/i.test(msg) && file !== 'core_tests.js' && file !== 'sync_tests.js' && file !== 'public_tests.js' && file !== 'admin_tests.js') continue; // opsiyonel dosya
+      if (/Cannot find module|Failed to load url|not found|No such module/i.test(msg) && file !== 'core_tests.js' && file !== 'sync_tests.js' && file !== 'public_tests.js' && file !== 'import_tests.js' && file !== 'admin_tests.js') continue; // opsiyonel dosya
       out.push({ module: label, name: `${file} yüklenebildi mi`, run: async () => { throw new Error('Modül yüklenemedi: ' + msg); } });
     }
   }

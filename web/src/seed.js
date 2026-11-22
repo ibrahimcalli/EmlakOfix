@@ -51,10 +51,28 @@ const PAGES = [
 
 const seeded = new WeakSet(); // env başına: bu izolede kontrol bir kez yapılsın
 
+const BANNERS_V2 = [
+  ['/assets/banner/fethiye-evler.jpg', "Fethiye'de hayalinizdeki ev", 'Satılık ve kiralık villa, daire ve arazi ilanları', '/satilik-villa', 'İlanları İncele'],
+  ['/assets/banner/arazi-gunbatimi.jpg', 'Arazi ve yatırım fırsatları', 'Fethiye ve çevresinde satılık arazi ilanları', '/satilik-arazi', 'Arazileri Gör'],
+  ['/assets/banner/sehir-aksami.jpg', 'Güvenilir emlak danışmanlığı', 'Alım, satım ve kiralamada yanınızdayız', '/iletisim', 'Bize Ulaşın'],
+];
+// Tek seferlik: ana sayfa banner gorselleri (gorselsiz mevcut banner'a gorsel, eksikler eklenir). Yonetici silerse geri gelmez.
+async function ensureV2(env) {
+  if (await first(env, "SELECT value FROM settings WHERE key='banners_v2'")) return;
+  const claim = await run(env, "INSERT OR IGNORE INTO settings(key,value) VALUES('banners_v2',?)", nowIso());
+  if (claim && claim.meta && claim.meta.changes !== 1) return;
+  const st = [];
+  const n = Number(await scalar(env, 'SELECT COUNT(*) FROM banners')) || 0;
+  const bare = await first(env, "SELECT id FROM banners WHERE image='' ORDER BY id LIMIT 1");
+  if (bare) st.push(["UPDATE banners SET image=? WHERE id=?", BANNERS_V2[0][0], bare.id]);
+  if (n <= 1) BANNERS_V2.slice(bare ? 1 : 0).forEach((b, i) => st.push(['INSERT INTO banners(title,subtitle,image,link,button,sort_key,visible) VALUES(?,?,?,?,?,?,1)', b[1], b[2], b[0], b[3], b[4], 2 + i]));
+  if (st.length) await batch(env, st);
+}
+
 export async function ensureSeed(env) {
   if (seeded.has(env)) return { seeded: false };
   const done = await first(env, "SELECT value FROM settings WHERE key='seeded'");
-  if (done) { seeded.add(env); return { seeded: false }; }
+  if (done) { await ensureV2(env); seeded.add(env); return { seeded: false }; }
   // Yarış: yalnız 'seeded' satırını ilk ekleyen (changes=1) tohumlar.
   const claim = await run(env, "INSERT OR IGNORE INTO settings(key,value) VALUES('seeded',?)", nowIso());
   const won = claim && claim.meta ? claim.meta.changes === 1 : true;
@@ -78,6 +96,7 @@ export async function ensureSeed(env) {
       st.push(['INSERT OR IGNORE INTO posts(slug,category_id,title,excerpt,body,image,status,author,source,published_at,updated_at) VALUES(?,COALESCE((SELECT id FROM blog_categories WHERE slug=?),0),?,?,?,\'\',\'yayinda\',?,\'import\',?,?)', p.slug, slugify(cat ? cat.name : p.category, 80), p.title, p.excerpt, body, 'İbrahim Çallı', p.published_at || now, now]);
     }
     await batch(env, st);
+    await ensureV2(env);
     return { seeded: true };
   } catch (e) {
     try { await run(env, "DELETE FROM settings WHERE key='seeded'"); } catch { /* yoksay */ }

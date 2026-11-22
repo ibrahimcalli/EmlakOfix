@@ -4,6 +4,7 @@ import { sanitizeHtml } from './sanitize.js';
 import { all, first, run, scalar, logActivity } from './env.js';
 import { shell, fld, postForm, btnPost, pageLinks, paging, likeArg, ESC_LIKE, okRedirect, errRedirect, jsonOk, jsonErr, emptyRow, dt, notFoundPage, checkImage, randomName } from './admin_ui.js';
 import { uniqueSlug, RESERVED_SLUGS, waNumber } from './admin_util.js';
+import { importer } from './admin_import.js';
 
 export async function handle(ctx, parts) {
   switch (parts[0]) {
@@ -28,6 +29,7 @@ async function posts(ctx, parts, kind) {
   const cats = await all(env, 'SELECT id,name,slug FROM blog_categories WHERE kind=? ORDER BY sort_key,name', kind);
   const catIds = cats.map((c) => c.id);
   const sub = parts[1] || '';
+  if (sub === 'ice-aktar') return importer(ctx, base, cats, kind);
   if (ctx.method === 'POST') {
     if (sub === 'kaydet') {
       const id = toInt(ctx.s('id'), 0);
@@ -83,7 +85,7 @@ ${id ? html`<div class="card">${btnPost(ctx, `${base}/sil`, `${label} sil`, { cl
   const pg = paging(ctx.url, total, 25);
   const rows = await all(env, `SELECT id,slug,title,category_id,status,source,published_at FROM posts WHERE ${w.join(' AND ')} ORDER BY published_at DESC, id DESC LIMIT ? OFFSET ?`, ...a, pg.per, pg.offset);
   const cn = Object.fromEntries(cats.map((c) => [c.id, c.name]));
-  const body = html`<form class="row filters" method="get"><input type="search" name="q" value="${q}" placeholder="Başlıkta ara"><select name="kategori"><option value="">Kategori: hepsi</option>${cats.map((c) => html`<option value="${c.id}"${cat === c.id ? raw(' selected') : ''}>${c.name}</option>`)}</select><select name="durum"><option value="">Durum: hepsi</option><option value="yayinda"${st === 'yayinda' ? raw(' selected') : ''}>Yayında</option><option value="taslak"${st === 'taslak' ? raw(' selected') : ''}>Taslak</option></select><button class="btn" type="submit">Süz</button> <a class="btn primary" href="${base}/yeni">+ Yeni ${label.toLowerCase()}</a></form>
+  const body = html`<form class="row filters" method="get"><input type="search" name="q" value="${q}" placeholder="Başlıkta ara"><select name="kategori"><option value="">Kategori: hepsi</option>${cats.map((c) => html`<option value="${c.id}"${cat === c.id ? raw(' selected') : ''}>${c.name}</option>`)}</select><select name="durum"><option value="">Durum: hepsi</option><option value="yayinda"${st === 'yayinda' ? raw(' selected') : ''}>Yayında</option><option value="taslak"${st === 'taslak' ? raw(' selected') : ''}>Taslak</option></select><button class="btn" type="submit">Süz</button> <a class="btn primary" href="${base}/yeni">+ Yeni ${label.toLowerCase()}</a> <a class="btn" href="${base}/ice-aktar">Siteden içe aktar</a></form>
 <div class="card"><div class="tablewrap"><table class="tbl"><thead><tr><th>Başlık</th><th>Kategori</th><th>Durum</th><th>Tarih</th><th></th></tr></thead><tbody>${rows.length ? rows.map((p) => html`<tr><td><a href="${base}/${p.id}"><strong>${p.title}</strong></a>${p.source !== 'admin' ? html` <span class="badge">${p.source}</span>` : ''}</td><td>${cn[p.category_id] || '—'}</td><td>${p.status === 'yayinda' ? html`<span class="badge ok">yayında</span>` : html`<span class="badge off">taslak</span>`}</td><td class="muted nowrap">${dt(p.published_at)}</td><td class="actions"><a class="btn sm" href="${base}/${p.id}">Düzenle</a> ${btnPost(ctx, `${base}/durum`, p.status === 'yayinda' ? 'Taslağa al' : 'Yayınla', { fields: { id: p.id } })}</td></tr>`) : emptyRow(5, 'Kayıt yok.')}</tbody></table></div>${pageLinks(ctx.url, pg.page, pg.pages)}</div>`;
   return shell(ctx, { title: kind === 'news' ? 'Haberler' : 'Blog yazıları', active: base, body });
 }

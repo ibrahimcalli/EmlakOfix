@@ -304,16 +304,30 @@ export function cardHtml(pc, l, tagMap, opt = {}) {
 </article>`;
 }
 
-export function postImage(p) { return mediaUrl(p.image); }
+// Yazi gorseli: yuklenen gorsel yoksa kategori klasorundeki varsayilan gorsel (public/assets/blog/<kategori>/).
+const SEED_IMG = {
+  'kirsal-yerlesik-alanlarda-hisseli-parsellerin-yapilasma-rejimi': 'hisseli-arazilerle-ilgili-yazilar',
+  '7584-sayili-kanun-ve-6831-ek-madde-22-2b-ve-orman-kadastrosunda-yeni-donem': 'sektore-dair-cikan-haberler',
+  'evini-kiraya-verenler-icin-kira-geliri-beyannamesi-rehberi-2026-guncel': 'sektore-dair-cikan-haberler',
+  'ticari-arsa-nedir': 'arazi-cesitleri-ve-imar-durumlari',
+  'muhtelif-tapu-nedir': 'gayrimenkul-satin-alma-surecleri',
+};
+const CAT_IMG = new Set(['arazi-cesitleri-ve-imar-durumlari', 'gayrimenkul-satin-alma-surecleri', 'hisseli-arazilerle-ilgili-yazilar', 'sektore-dair-cikan-haberler']);
+export function postImage(p, cat) {
+  const own = mediaUrl(p.image); if (own) return own;
+  if (SEED_IMG[p.slug]) return `/assets/blog/${SEED_IMG[p.slug]}/${p.slug}.jpg`;
+  if (cat && CAT_IMG.has(cat.slug)) return `/assets/blog/${cat.slug}/varsayilan.jpg`;
+  return '/assets/blog/gayrimenkul-satin-alma-surecleri/varsayilan.jpg';
+}
 export function postCardHtml(pc, p, catMap) {
   const lang = pc.lang;
   const title = pickLang(p, 'title', lang);
   const url = href(pc, `/yazi/${encodeURIComponent(p.slug)}`);
-  const img = postImage(p);
   const cat = catMap && catMap.get(p.category_id);
+  const img = postImage(p, cat);
   const ex = p.excerpt || truncate(stripTags(pickLang(p, 'body', lang)), 160);
   return html`<article class="post-card">
-  <a class="pc-img" href="${url}" tabindex="-1" aria-hidden="true">${img ? html`<img src="${img}" alt="" width="640" height="400" loading="lazy" decoding="async">` : html`<span class="pc-empty"></span>`}</a>
+  <a class="pc-img" href="${url}" tabindex="-1" aria-hidden="true">${img ? html`<img src="${img}" alt="" width="640" height="640" loading="lazy" decoding="async">` : html`<span class="pc-empty"></span>`}</a>
   <div class="pc-body">
     ${cat ? html`<a class="pc-cat" href="${href(pc, `/blog/${encodeURIComponent(cat.slug)}`)}">${pickLang(cat, 'name', lang)}</a>` : ''}
     <h3><a href="${url}">${title}</a></h3>

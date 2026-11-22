@@ -184,3 +184,22 @@ textarea{min-height:120px;resize:vertical}
 @media (min-width:981px) and (max-width:1500px){.hdr-phone{display:none}}
 
 .crumbs ol,.crumbs ul{list-style:none;margin:0;padding:0}.crumbs li{list-style:none}
+
+/* Kategori / blog ust link listesi (hap bicimi) */
+ul.chips{list-style:none;margin:0 0 1.2rem;padding:0;display:flex;flex-wrap:wrap;gap:.5rem}
+ul.chips li{list-style:none;margin:0;padding:0}
+ul.chips a{display:inline-block;padding:.38rem .85rem;border:1px solid var(--line,#d8dde3);border-radius:999px;background:var(--card,#fff);color:inherit;text-decoration:none;font-size:.9rem;line-height:1.3;transition:background .15s,color .15s,border-color .15s}
+ul.chips a:hover{border-color:var(--accent);color:var(--accent)}
+ul.chips a[aria-current],ul.chips a.on,ul.chips a.active{background:var(--accent);border-color:var(--accent);color:#fff}
+@media(max-width:600px){ul.chips{gap:.4rem}ul.chips a{padding:.32rem .7rem;font-size:.85rem}}
+
+/* Blog: kare kucuk resim (varsayilan) / liste gorunumu; yazi sayfasinda genis ince banner */
+.pc-img{aspect-ratio:1/1;overflow:hidden}.pc-img img{transition:transform .3s}.post-card:hover .pc-img img{transform:scale(1.04)}
+.post-grid.view-list{grid-template-columns:minmax(0,1fr)!important;gap:14px}
+.post-grid.view-list .post-card{flex-direction:row}
+.post-grid.view-list .pc-img{flex:0 0 200px;aspect-ratio:1/1;align-self:stretch}
+@media(max-width:560px){.post-grid.view-list .pc-img{flex-basis:110px}.post-grid.view-list .pc-body p:not(.pc-date){display:none}}
+.post-img{margin:0 0 1.2rem;border-radius:var(--radius);overflow:hidden;aspect-ratio:3/1;background:linear-gradient(135deg,var(--primary),var(--accent))}
+.post-img img{width:100%;height:100%;object-fit:cover;display:block}
+@media(max-width:700px){.post-img{aspect-ratio:2/1}}
+.page-title+.view-toggle,ul.chips+.view-toggle{margin:0 0 1rem}

@@ -465,13 +465,15 @@ async function blogList(env, url, pc, catSlug) {
   const pages = Math.max(1, Math.ceil(total / per));
   const page = clamp(toInt(url.searchParams.get('page'), 1), 1, pages);
   const posts = await all(env, `SELECT * FROM posts WHERE ${where} ORDER BY published_at DESC, id DESC LIMIT ? OFFSET ?`, ...args, per, (page - 1) * per);
+  const bview = url.searchParams.get('view') === 'list' ? 'list' : 'thumb';
   const title = cat ? pickLang(cat, 'name', lang) : (s.blog_title || t(lang, 'blog'));
   const basePath = cat ? `/blog/${encodeURIComponent(cat.slug)}` : '/blog';
+  const vtoggle = html`<div class="view-toggle" role="group" aria-label="${t(lang, 'view_thumb')} / ${t(lang, 'view_list')}"><a href="${href(pc, basePath)}" class="vt vt-thumb${bview === 'thumb' ? ' on' : ''}" aria-label="${t(lang, 'view_thumb')}" title="${t(lang, 'view_thumb')}"${bview === 'thumb' ? raw(' aria-current="true"') : ''}>▦</a><a href="${href(pc, basePath)}?view=list" class="vt vt-list${bview === 'list' ? ' on' : ''}" aria-label="${t(lang, 'view_list')}" title="${t(lang, 'view_list')}"${bview === 'list' ? raw(' aria-current="true"') : ''}>☰</a></div>`;
   const body = html`${crumbs(pc, cat ? [[t(lang, 'home'), href(pc, '/')], [s.blog_title || t(lang, 'blog'), href(pc, '/blog')], [title, '']] : [[t(lang, 'home'), href(pc, '/')], [title, '']])}
 <h1 class="page-title">${title}</h1>
 ${cats.length ? html`<ul class="chips" aria-label="${t(lang, 'w_categories')}"><li><a href="${href(pc, '/blog')}"${!cat ? raw(' aria-current="page"') : ''}>${t(lang, 'blog_all')}</a></li>${cats.map((c) => html`<li><a href="${href(pc, `/blog/${encodeURIComponent(c.slug)}`)}"${cat && cat.id === c.id ? raw(' aria-current="page"') : ''}>${pickLang(c, 'name', lang)}</a></li>`)}</ul>` : ''}
-${posts.length ? html`<div class="post-grid">${posts.map((p) => postCardHtml(pc, p, catMap))}</div>` : html`<p class="empty">${t(lang, 'blog_empty')}</p>`}
-${paginationHtml(pc, basePath, {}, page, pages)}`;
+${posts.length ? html`${vtoggle}<div class="post-grid view-${bview}">${posts.map((p) => postCardHtml(pc, p, catMap))}</div>` : html`<p class="empty">${t(lang, 'blog_empty')}</p>`}
+${paginationHtml(pc, basePath, bview === 'list' ? { view: 'list' } : {}, page, pages)}`;
   return respond(pc, 200, { title, path: basePath, body, sidebar: await buildSidebar(env, pc, 'blog'), canonicalSearch: page > 1 ? qs({ page }) : '', bodyClass: 'p-blog' });
 }
 
@@ -484,14 +486,14 @@ async function postPage(env, url, pc, slug, ctx) {
   const catMap = new Map((await all(env, 'SELECT * FROM blog_categories')).map((c) => [c.id, c]));
   const title = pickLang(p, 'title', lang);
   const bodyHtml = sanitizeHtml(pickLang(p, 'body', lang));
-  const img = postImage(p);
+  const img = postImage(p, cat);
   const path = `/yazi/${encodeURIComponent(p.slug)}`;
   const related = await all(env, "SELECT * FROM posts WHERE status='yayinda' AND id<>? ORDER BY (category_id=?) DESC, published_at DESC LIMIT 3", p.id, p.category_id || 0);
   const desc = p.excerpt || truncate(stripTags(bodyHtml), 180);
   const body = html`${crumbs(pc, [[t(lang, 'home'), href(pc, '/')], [pc.s.blog_title || t(lang, 'blog'), href(pc, '/blog')], ...(cat ? [[pickLang(cat, 'name', lang), href(pc, `/blog/${encodeURIComponent(cat.slug)}`)]] : []), [title, '']])}
 <article class="post">
   <header><h1 class="page-title">${title}</h1><p class="post-meta">${fmtDate(p.published_at, lang)}${p.author ? html` · ${t(lang, 'by')}: ${p.author}` : ''}${cat ? html` · <a href="${href(pc, `/blog/${encodeURIComponent(cat.slug)}`)}">${pickLang(cat, 'name', lang)}</a>` : ''}</p></header>
-  ${img ? html`<figure class="post-img"><img src="${img}" alt="${title}" width="960" height="540" loading="eager" decoding="async"></figure>` : ''}
+  ${img ? html`<figure class="post-img"><img src="${img}" alt="${title}" width="1200" height="400" loading="eager" decoding="async"></figure>` : ''}
   <div class="rich post-body">${raw(bodyHtml)}</div>
 </article>
 ${related.length ? html`<section class="related"><h2 class="sec-title">${t(lang, 'related')}</h2><div class="post-grid">${related.map((r) => postCardHtml(pc, r, catMap))}</div></section>` : ''}`;
